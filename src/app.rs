@@ -8,8 +8,12 @@ use vulkan_bindings::{
     VkApplicationInfo, VkInstance, VkInstanceCreateInfo,
     VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
-    vk_destroy_instance, vk_get_supported_extensions, vk_make_api_version, vk_make_version,
+    vk_destroy_instance, vk_get_available_layer_properties, vk_get_supported_extensions,
+    vk_make_api_version, vk_make_version,
 };
+
+const DEBUG_ENABLED: bool = cfg!(debug_assertions);
+static VALIDATION_LAYERS: &[&str] = &["VK_LAYER_KHRONOS_validation"];
 
 #[derive(Default)]
 pub struct App {
@@ -27,6 +31,9 @@ impl App {
     // VULKAN FUNCTIONS
 
     fn vk_create_instance(self: &mut Self) {
+        if DEBUG_ENABLED && !self.check_validation_layer_support() {
+            panic!("Validation layers not available");
+        }
         let mut app_info = VkApplicationInfo::default();
         app_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO);
         app_info.set_p_application_name("Hello Triangle");
@@ -44,22 +51,43 @@ impl App {
         instance_create_info.set_pp_enabled_extension_names(extensions);
         instance_create_info.set_enabled_layer_count(0);
 
+        // TODO check supported extensions against required extensions
+        let (_extension_count, _supported_extensions) = match vk_get_supported_extensions() {
+            Ok(extensions) => extensions,
+            Err(err) => panic!("Could not obtain supported extensions: {:?}", err),
+        };
+
         self.vk_instance = match vk_create_instance(&instance_create_info) {
             Ok(instance) => Some(instance),
             Err(err) => panic!("Could not create instance: {:?}", err),
         };
 
-        let (extension_count, supported_extensions) = match vk_get_supported_extensions() {
+        self.check_validation_layer_support();
+    }
+
+    fn check_validation_layer_support(self: &mut Self) -> bool {
+        let (_layer_count, available_layers) = match vk_get_available_layer_properties() {
             Ok(extensions) => extensions,
             Err(err) => panic!("Could not obtain supported extensions: {:?}", err),
         };
 
-        for extension in supported_extensions {
-            println!(
-                "Supported: '{}'",
-                StringFfi::from_i8_array(&extension.extensionName)
-            )
+        for validation_layer in VALIDATION_LAYERS {
+            let mut layer_found = false;
+
+            for layer_properties in &available_layers {
+                if validation_layer.to_string()
+                    == StringFfi::from_i8_array(&layer_properties.layerName).to_string()
+                {
+                    layer_found = true;
+                    break;
+                }
+            }
+
+            if !layer_found {
+                return false;
+            }
         }
+        return true;
     }
 
     // GLFW FUNCTIONS

@@ -66,9 +66,30 @@ pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>)
         }
     };
 }
+pub fn vk_get_available_layer_properties() -> Result<(u32, Vec<VkLayerProperties>), VulkanError> {
+    let mut layer_count: u32 = 0;
+    unsafe {
+        let mut result =
+            vkEnumerateInstanceLayerProperties(&mut layer_count, core::ptr::null_mut());
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotEnumerateLayerProperties);
+        };
+
+        let mut layers: Vec<VkLayerProperties> = vec![std::mem::zeroed(); layer_count as usize];
+
+        result = vkEnumerateInstanceLayerProperties(&mut layer_count, layers.as_mut_ptr());
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotEnumerateLayerProperties);
+        } else {
+            return Ok((layer_count, layers));
+        }
+    };
+}
 
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
     CouldNotEnumerateExtensionProperties,
+    CouldNotEnumerateLayerProperties,
 }
