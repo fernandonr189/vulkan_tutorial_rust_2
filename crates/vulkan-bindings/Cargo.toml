@@ -8,3 +8,6 @@ bindgen = "0.71.1"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+ffi-utils = { path = "../ffi-utils" }

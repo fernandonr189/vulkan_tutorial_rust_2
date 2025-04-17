@@ -6,5 +6,8 @@ edition = "2024"
 [build-dependencies]
 bindgen = "0.71.1"
 
+[dependencies]
+ffi-utils = { path = "../ffi-utils" }
+
 [lib]
 path = "src/lib.rs"

@@ -3,7 +3,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(improper_ctypes)]
 
-use std::{ffi::CString, ptr::null_mut};
+use std::{
+    ffi::{CString, c_char},
+    ptr::null_mut,
+};
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 pub fn glfw_init() {
@@ -65,7 +68,20 @@ pub fn glfw_window_should_close(window: &mut GLFWwindow) -> bool {
     }
 }
 
+pub fn glfw_get_required_instance_extensions() -> Result<(u32, *const *const i8), GlfwError> {
+    let mut count: u32 = 0;
+    let extensions: *const *const c_char;
+    unsafe {
+        extensions = glfwGetRequiredInstanceExtensions(&mut count);
+    }
+    if extensions.is_null() || count == 0 {
+        return Err(GlfwError::InstanceExtensionsError);
+    };
+    Ok((count, extensions))
+}
+
 #[derive(Debug)]
 pub enum GlfwError {
     CreateWindowError,
+    InstanceExtensionsError,
 }
