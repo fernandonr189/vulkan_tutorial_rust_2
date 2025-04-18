@@ -124,10 +124,34 @@ pub fn vk_get_physical_device_features(device: VkPhysicalDevice) -> VkPhysicalDe
     }
 }
 
+pub fn vk_get_physical_device_queue_family_properties(
+    device: VkPhysicalDevice,
+) -> Result<Vec<VkQueueFamilyProperties>, VulkanError> {
+    unsafe {
+        let mut queue_family_count: u32 = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &mut queue_family_count, null_mut());
+
+        if queue_family_count == 0 {
+            return Err(VulkanError::CouldNotGetDeviceQueueFamilyProperties);
+        };
+
+        let mut queue_families: Vec<VkQueueFamilyProperties> =
+            vec![std::mem::zeroed(); queue_family_count as usize];
+
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            device,
+            &mut queue_family_count,
+            queue_families.as_mut_ptr(),
+        );
+        Ok(queue_families)
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
     CouldNotEnumerateExtensionProperties,
     CouldNotEnumerateLayerProperties,
     CouldNotEnumerateDevices,
+    CouldNotGetDeviceQueueFamilyProperties,
 }

@@ -7,11 +7,12 @@ use glfw_bindings::{
 use vulkan_bindings::{
     VkApplicationInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
-    VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
     vk_destroy_instance, vk_get_available_devices, vk_get_available_layer_properties,
     vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
+    vk_get_physical_device_queue_family_properties, vk_get_supported_extensions,
+    vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -121,9 +122,28 @@ impl App {
         let device_properties = vk_get_physical_device_properties(device);
         let device_features = vk_get_physical_device_features(device);
 
+        let queue_family_indices = self.vk_find_queue_families(device);
+
         return device_properties.deviceType
             == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-            && device_features.geometryShader == 1;
+            && device_features.geometryShader == 1
+            && queue_family_indices.graphics_family.is_some();
+    }
+
+    fn vk_find_queue_families(self: &mut Self, device: VkPhysicalDevice) -> QueueFamilyIndices {
+        let mut indices = QueueFamilyIndices::default();
+
+        let queue_families = match vk_get_physical_device_queue_family_properties(device) {
+            Ok(families) => families,
+            Err(err) => panic!("Failed to get queue families: {:?}", err),
+        };
+
+        for (i, queue_family) in queue_families.iter().enumerate() {
+            if queue_family.queueFlags & VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT != 0 {
+                indices.graphics_family = Some(i as u32);
+            }
+        }
+        indices
     }
     // GLFW FUNCTIONS
 
@@ -154,4 +174,9 @@ impl Drop for App {
     fn drop(self: &mut Self) {
         self.cleanup();
     }
+}
+
+#[derive(Default)]
+pub struct QueueFamilyIndices {
+    graphics_family: Option<u32>,
 }
