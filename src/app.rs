@@ -169,8 +169,6 @@ impl App {
 
             if indices.is_complete() {
                 break;
-            } else {
-                indices.clear();
             }
         }
         indices
@@ -273,9 +271,5 @@ pub struct QueueFamilyIndices {
 impl QueueFamilyIndices {
     pub fn is_complete(&self) -> bool {
         self.graphics_family.is_some() && self.present_family.is_some()
-    }
-    pub fn clear(&mut self) {
-        self.graphics_family = None;
-        self.present_family = None;
     }
 }
