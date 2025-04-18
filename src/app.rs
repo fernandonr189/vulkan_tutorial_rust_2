@@ -5,11 +5,13 @@ use glfw_bindings::{
     glfw_terminate, glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VkApplicationInfo, VkInstance, VkInstanceCreateInfo,
+    VkApplicationInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
     VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
-    vk_destroy_instance, vk_get_available_layer_properties, vk_get_supported_extensions,
-    vk_make_api_version, vk_make_version,
+    vk_destroy_instance, vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -19,16 +21,22 @@ static VALIDATION_LAYERS: &[&str] = &["VK_LAYER_KHRONOS_validation"];
 pub struct App {
     window: Option<GLFWwindow>,
     vk_instance: Option<VkInstance>,
+    vk_physical_device: Option<VkPhysicalDevice>,
 }
 
 impl App {
     pub fn run(self: &mut Self) {
         self.init_window();
-        self.vk_create_instance();
+        self.init_vulkan();
         self.main_loop();
     }
 
     // VULKAN FUNCTIONS
+
+    fn init_vulkan(self: &mut Self) {
+        self.vk_create_instance();
+        self.vk_pick_physical_device();
+    }
 
     fn vk_create_instance(self: &mut Self) {
         if DEBUG_ENABLED && !self.check_validation_layer_support() {
@@ -90,6 +98,33 @@ impl App {
         return true;
     }
 
+    fn vk_pick_physical_device(self: &mut Self) {
+        let (_device_count, physical_devices) =
+            match vk_get_available_devices(self.vk_instance.unwrap()) {
+                Ok(devices) => devices,
+                Err(err) => panic!("Could not obtain avaliable devices: {:?}", err),
+            };
+
+        for device in &physical_devices {
+            if self.vk_is_device_suitable(*device) {
+                self.vk_physical_device = Some(*device);
+                break;
+            }
+        }
+
+        if self.vk_physical_device.is_none() {
+            panic!("No suitable devices found!")
+        }
+    }
+
+    fn vk_is_device_suitable(self: &mut Self, device: VkPhysicalDevice) -> bool {
+        let device_properties = vk_get_physical_device_properties(device);
+        let device_features = vk_get_physical_device_features(device);
+
+        return device_properties.deviceType
+            == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+            && device_features.geometryShader == 1;
+    }
     // GLFW FUNCTIONS
 
     fn init_window(self: &mut Self) {
