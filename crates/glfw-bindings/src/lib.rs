@@ -105,6 +105,15 @@ pub fn glfw_create_window_surface(
     }
 }
 
+pub fn glfw_get_framebuffer_size(window: *mut GLFWwindow) -> (u32, u32) {
+    unsafe {
+        let mut width = 0;
+        let mut height = 0;
+        glfwGetFramebufferSize(window, &mut width, &mut height);
+        (width as u32, height as u32)
+    }
+}
+
 #[derive(Debug)]
 pub enum GlfwError {
     CreateWindowError,

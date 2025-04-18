@@ -50,6 +50,12 @@ pub fn vk_destroy_surface_khr(instance: VkInstance, surface: VkSurfaceKHR) {
     }
 }
 
+pub fn vk_destroy_swapchain_khr(device: VkDevice, swapchain: VkSwapchainKHR) {
+    unsafe {
+        vkDestroySwapchainKHR(device, swapchain, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -310,6 +316,22 @@ pub fn vk_get_physical_device_surface_present_modes_khr(
     }
 }
 
+pub fn vk_create_swapchain_khr(
+    device: VkDevice,
+    swapchain_create_info: VkSwapchainCreateInfoKHR,
+) -> Result<VkSwapchainKHR, VulkanError> {
+    unsafe {
+        let mut swapchain: VkSwapchainKHR = std::mem::zeroed();
+        let result = vkCreateSwapchainKHR(device, &swapchain_create_info, null(), &mut swapchain);
+
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateSwapchain)
+        } else {
+            Ok(swapchain)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -323,4 +345,5 @@ pub enum VulkanError {
     CouldNotDetermineSurfaceCapabilities,
     CouldNotDeterminaSurfaceFormats,
     CouldNotDetermineSurfacePresentModes,
+    CouldNotCreateSwapchain,
 }

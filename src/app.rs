@@ -1,21 +1,34 @@
-use std::{collections::HashSet, ffi::c_char};
+use std::{
+    cmp::{max, min},
+    collections::HashSet,
+    ffi::c_char,
+    ptr::null_mut,
+};
 
 use ffi_utils::StringFfi;
 use glfw_bindings::{
     self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
-    glfw_create_window_surface, glfw_destroy_window, glfw_get_required_instance_extensions,
-    glfw_init, glfw_poll_events, glfw_terminate, glfw_window_hint, glfw_window_should_close,
+    glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
+    glfw_get_required_instance_extensions, glfw_init, glfw_poll_events, glfw_terminate,
+    glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkDevice, VkDeviceCreateInfo,
-    VkDeviceQueueCreateInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR, VkQueue,
-    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo,
+    VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VkDevice, VkDeviceCreateInfo,
+    VkDeviceQueueCreateInfo, VkExtent2D, VkFormat_VK_FORMAT_B8G8R8A8_SRGB,
+    VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkInstance, VkInstanceCreateInfo,
+    VkPhysicalDevice, VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR,
+    VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
+    VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
+    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, VkSurfaceCapabilitiesKHR,
-    VkSurfaceFormatKHR, VkSurfaceKHR, vk_create_instance, vk_create_logical_device,
-    vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr, vk_get_available_devices,
+    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
+    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_instance,
+    vk_create_logical_device, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_instance,
+    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
     vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
     vk_get_physical_device_features, vk_get_physical_device_properties,
     vk_get_physical_device_queue_family_properties,
@@ -37,6 +50,7 @@ pub struct App {
     vk_surface_khr: Option<VkSurfaceKHR>,
     vk_graphics_queue: Option<VkQueue>,
     vk_present_queue: Option<VkQueue>,
+    vk_swap_chain: Option<VkSwapchainKHR>,
 }
 
 impl App {
@@ -53,6 +67,8 @@ impl App {
         self.glfw_create_surface();
         self.vk_pick_physical_device();
         self.vk_create_logical_device();
+        self.vk_create_swap_chain();
+        panic!("Swapchain creation failed");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -303,6 +319,115 @@ impl App {
         swapchain_support_details
     }
 
+    fn vk_create_swap_chain(&mut self) {
+        let swapchain_support_details =
+            self.vk_query_swapchain_support(self.vk_physical_device.unwrap());
+
+        let surface_format = self.vk_choose_swap_surface_format(swapchain_support_details.formats);
+        let present_mode =
+            self.vk_choose_swap_present_mode(swapchain_support_details.present_modes);
+        let extent = self.vk_choose_swap_extent(swapchain_support_details.capabilities);
+
+        let mut image_count = swapchain_support_details.capabilities.minImageCount + 1;
+
+        if swapchain_support_details.capabilities.maxImageCount > 0
+            && image_count > swapchain_support_details.capabilities.maxImageCount
+        {
+            image_count = swapchain_support_details.capabilities.maxImageCount;
+        }
+
+        let mut swapchain_create_info = VkSwapchainCreateInfoKHR::default();
+        swapchain_create_info
+            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
+        swapchain_create_info.set_surface(self.vk_surface_khr.unwrap());
+        swapchain_create_info.set_min_image_count(image_count);
+        swapchain_create_info.set_image_color_space(surface_format.colorSpace);
+        swapchain_create_info.set_image_extent(extent);
+        swapchain_create_info.set_image_array_layers(1);
+        swapchain_create_info
+            .set_image_usage(VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+
+        if queue_family_indices.graphics_family.unwrap()
+            != queue_family_indices.present_family.unwrap()
+        {
+            swapchain_create_info.set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_CONCURRENT);
+            swapchain_create_info.set_queue_family_index_count(2);
+            swapchain_create_info.set_p_queue_family_indices(&[
+                queue_family_indices.graphics_family.unwrap(),
+                queue_family_indices.present_family.unwrap(),
+            ]);
+        } else {
+            swapchain_create_info.set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_EXCLUSIVE);
+            swapchain_create_info.set_queue_family_index_count(0);
+            swapchain_create_info.set_p_queue_family_indices(&[]);
+        }
+        swapchain_create_info
+            .set_pre_transform(swapchain_support_details.capabilities.currentTransform);
+        swapchain_create_info
+            .set_composite_alpha(VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
+        swapchain_create_info.set_present_mode(present_mode);
+        swapchain_create_info.set_clipped(true);
+        swapchain_create_info.set_old_swapchain(null_mut());
+
+        self.vk_swap_chain =
+            match vk_create_swapchain_khr(self.vk_logical_device.unwrap(), swapchain_create_info) {
+                Ok(swap_chain) => Some(swap_chain),
+                Err(err) => panic!("Failed to create swap chain: {:?}", err),
+            };
+    }
+
+    fn vk_choose_swap_surface_format(
+        self: &mut Self,
+        available_formats: Vec<VkSurfaceFormatKHR>,
+    ) -> VkSurfaceFormatKHR {
+        for format in &available_formats {
+            if format.format == VkFormat_VK_FORMAT_B8G8R8A8_SRGB
+                && format.colorSpace == VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+            {
+                return format.to_owned();
+            }
+        }
+        available_formats[0]
+    }
+
+    fn vk_choose_swap_present_mode(
+        self: &mut Self,
+        available_present_modes: Vec<VkPresentModeKHR>,
+    ) -> VkPresentModeKHR {
+        for mode in &available_present_modes {
+            if *mode == VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR {
+                return *mode;
+            }
+        }
+        VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR
+    }
+
+    fn vk_choose_swap_extent(
+        self: &mut Self,
+        capabilities: VkSurfaceCapabilitiesKHR,
+    ) -> VkExtent2D {
+        if capabilities.currentExtent.width != u32::MAX {
+            return capabilities.currentExtent;
+        } else {
+            let (width, height) = glfw_get_framebuffer_size(self.window.unwrap());
+
+            let mut actual_extent = VkExtent2D { width, height };
+
+            actual_extent.width = min(
+                max(actual_extent.width, capabilities.minImageExtent.width),
+                capabilities.maxImageExtent.width,
+            );
+
+            actual_extent.height = min(
+                max(actual_extent.height, capabilities.minImageExtent.height),
+                capabilities.maxImageExtent.height,
+            );
+            return actual_extent;
+        }
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -330,15 +455,18 @@ impl App {
     }
 
     fn cleanup(&mut self) {
+        if let (Some(device), Some(swapchain)) =
+            (self.vk_logical_device.take(), self.vk_swap_chain.take())
+        {
+            vk_destroy_swapchain_khr(device, swapchain);
+            vk_destroy_device(device);
+        }
+
         if let (Some(instance), Some(surface)) =
             (self.vk_instance.take(), self.vk_surface_khr.take())
         {
             vk_destroy_surface_khr(instance, surface);
             vk_destroy_instance(instance);
-        }
-
-        if let Some(device) = self.vk_logical_device.take() {
-            vk_destroy_device(device);
         }
 
         if let Some(window) = self.window.take() {
