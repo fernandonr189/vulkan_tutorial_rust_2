@@ -1,4 +1,4 @@
-use std::ffi::c_char;
+use std::{collections::HashSet, ffi::c_char};
 
 use ffi_utils::StringFfi;
 use glfw_bindings::{
@@ -30,8 +30,9 @@ pub struct App {
     vk_instance: Option<VkInstance>,
     vk_physical_device: Option<VkPhysicalDevice>,
     vk_logical_device: Option<VkDevice>,
-    vk_queue: Option<VkQueue>,
     vk_surface_khr: Option<VkSurfaceKHR>,
+    vk_graphics_queue: Option<VkQueue>,
+    vk_present_queue: Option<VkQueue>,
 }
 
 impl App {
@@ -177,17 +178,27 @@ impl App {
     fn vk_create_logical_device(self: &mut Self) {
         let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
 
-        let mut queue_create_info = VkDeviceQueueCreateInfo::default();
-        queue_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
-        queue_create_info.set_queue_family_index(queue_family_indices.graphics_family.unwrap());
-        queue_create_info.set_queue_count(1);
-        queue_create_info.set_p_queue_priorities(&[1.0]);
+        let mut queue_create_infos: Vec<VkDeviceQueueCreateInfo> = Vec::new();
+        let mut unique_families = HashSet::<u32>::new();
+        unique_families.insert(queue_family_indices.graphics_family.unwrap());
+        unique_families.insert(queue_family_indices.present_family.unwrap());
+
+        let priority = 1.0;
+        for family in unique_families {
+            let mut queue_create_info = VkDeviceQueueCreateInfo::default();
+            queue_create_info
+                .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
+            queue_create_info.set_queue_family_index(family);
+            queue_create_info.set_queue_count(1);
+            queue_create_info.set_p_queue_priorities(&[priority]);
+            queue_create_infos.push(queue_create_info);
+        }
 
         let mut device_create_info = VkDeviceCreateInfo::default();
         let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
         device_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
-        device_create_info.set_p_queue_create_infos(&queue_create_info);
-        device_create_info.set_queue_create_info_count(1);
+        device_create_info.set_p_queue_create_infos(queue_create_infos.as_ptr());
+        device_create_info.set_queue_create_info_count(queue_create_infos.len() as u32);
         device_create_info.set_p_enabled_features(&device_features);
         device_create_info.set_enabled_extension_count(0);
 
@@ -209,9 +220,15 @@ impl App {
                 Err(err) => panic!("Failed to create logical device: {:?}", err),
             };
 
-        self.vk_queue = Some(vk_get_device_queue(
+        self.vk_graphics_queue = Some(vk_get_device_queue(
             self.vk_logical_device.unwrap(),
             queue_family_indices.graphics_family.unwrap(),
+            0,
+        ));
+
+        self.vk_present_queue = Some(vk_get_device_queue(
+            self.vk_logical_device.unwrap(),
+            queue_family_indices.present_family.unwrap(),
             0,
         ));
     }

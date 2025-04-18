@@ -12,7 +12,10 @@ impl VkDeviceCreateInfo {
     pub fn set_s_type(&mut self, s_type: VkStructureType) {
         self.sType = s_type;
     }
-    pub fn set_p_queue_create_infos(&mut self, p_queue_create_infos: &VkDeviceQueueCreateInfo) {
+    pub fn set_p_queue_create_infos(
+        &mut self,
+        p_queue_create_infos: *const VkDeviceQueueCreateInfo,
+    ) {
         self.pQueueCreateInfos = p_queue_create_infos;
     }
     pub fn set_queue_create_info_count(&mut self, queue_create_info_count: u32) {
