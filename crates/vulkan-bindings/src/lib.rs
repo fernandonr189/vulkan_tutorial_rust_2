@@ -38,6 +38,12 @@ pub fn vk_destroy_instance(instance: VkInstance) {
     };
 }
 
+pub fn vk_destroy_device(device: VkDevice) {
+    unsafe {
+        vkDestroyDevice(device, null());
+    };
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -147,6 +153,21 @@ pub fn vk_get_physical_device_queue_family_properties(
     }
 }
 
+pub fn vk_create_logical_device(
+    physical_device: VkPhysicalDevice,
+    create_info: &VkDeviceCreateInfo,
+) -> Result<VkDevice, VulkanError> {
+    unsafe {
+        let mut device: VkDevice = std::mem::zeroed();
+        let result = vkCreateDevice(physical_device, create_info, null(), &mut device);
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotCreateLogicalDevice);
+        };
+        Ok(device)
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -154,4 +175,5 @@ pub enum VulkanError {
     CouldNotEnumerateLayerProperties,
     CouldNotEnumerateDevices,
     CouldNotGetDeviceQueueFamilyProperties,
+    CouldNotCreateLogicalDevice,
 }

@@ -1,3 +1,5 @@
+use std::ffi::c_char;
+
 use ffi_utils::StringFfi;
 use glfw_bindings::{
     self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
@@ -5,14 +7,17 @@ use glfw_bindings::{
     glfw_terminate, glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VkApplicationInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
+    VkApplicationInfo, VkDevice, VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkInstance,
+    VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
-    vk_destroy_instance, vk_get_available_devices, vk_get_available_layer_properties,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties, vk_get_supported_extensions,
-    vk_make_api_version, vk_make_version,
+    vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_get_available_devices,
+    vk_get_available_layer_properties, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
+    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -23,6 +28,7 @@ pub struct App {
     window: Option<GLFWwindow>,
     vk_instance: Option<VkInstance>,
     vk_physical_device: Option<VkPhysicalDevice>,
+    vk_logical_device: Option<VkDevice>,
 }
 
 impl App {
@@ -37,10 +43,11 @@ impl App {
     fn init_vulkan(self: &mut Self) {
         self.vk_create_instance();
         self.vk_pick_physical_device();
+        self.vk_create_logical_device();
     }
 
     fn vk_create_instance(self: &mut Self) {
-        if DEBUG_ENABLED && !self.check_validation_layer_support() {
+        if DEBUG_ENABLED && !self.vk_check_validation_layer_support() {
             panic!("Validation layers not available");
         }
         let mut app_info = VkApplicationInfo::default();
@@ -71,10 +78,10 @@ impl App {
             Err(err) => panic!("Could not create instance: {:?}", err),
         };
 
-        self.check_validation_layer_support();
+        self.vk_check_validation_layer_support();
     }
 
-    fn check_validation_layer_support(self: &mut Self) -> bool {
+    fn vk_check_validation_layer_support(self: &mut Self) -> bool {
         let (_layer_count, available_layers) = match vk_get_available_layer_properties() {
             Ok(extensions) => extensions,
             Err(err) => panic!("Could not obtain supported extensions: {:?}", err),
@@ -141,9 +148,46 @@ impl App {
         for (i, queue_family) in queue_families.iter().enumerate() {
             if queue_family.queueFlags & VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT != 0 {
                 indices.graphics_family = Some(i as u32);
+                break;
             }
         }
         indices
+    }
+
+    fn vk_create_logical_device(self: &mut Self) {
+        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+
+        let mut queue_create_info = VkDeviceQueueCreateInfo::default();
+        queue_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
+        queue_create_info.set_queue_family_index(queue_family_indices.graphics_family.unwrap());
+        queue_create_info.set_queue_count(1);
+        queue_create_info.set_p_queue_priorities(&[1.0]);
+
+        let mut device_create_info = VkDeviceCreateInfo::default();
+        let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
+        device_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
+        device_create_info.set_p_queue_create_infos(&queue_create_info);
+        device_create_info.set_queue_create_info_count(1);
+        device_create_info.set_p_enabled_features(&device_features);
+        device_create_info.set_enabled_extension_count(0);
+
+        if DEBUG_ENABLED {
+            let strings_ffi: Vec<StringFfi> = VALIDATION_LAYERS
+                .iter()
+                .map(|&s| StringFfi::from_string(s))
+                .collect();
+            let layer_ptrs: Vec<*const c_char> = strings_ffi.iter().map(|cs| cs.as_ptr()).collect();
+            device_create_info.set_enabled_layer_count(VALIDATION_LAYERS.len() as u32);
+            device_create_info.set_pp_enabled_layer_names(layer_ptrs.as_ptr());
+        } else {
+            device_create_info.set_enabled_layer_count(0);
+        }
+
+        self.vk_logical_device =
+            match vk_create_logical_device(self.vk_physical_device.unwrap(), &device_create_info) {
+                Ok(device) => Some(device),
+                Err(err) => panic!("Failed to create logical device: {:?}", err),
+            };
     }
     // GLFW FUNCTIONS
 
@@ -165,6 +209,7 @@ impl App {
 
     fn cleanup(self: &mut Self) {
         vk_destroy_instance(self.vk_instance.unwrap());
+        vk_destroy_device(self.vk_logical_device.unwrap());
         glfw_destroy_window(&mut self.window.unwrap());
         glfw_terminate();
     }
