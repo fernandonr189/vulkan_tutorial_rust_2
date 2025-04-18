@@ -168,6 +168,14 @@ pub fn vk_create_logical_device(
     }
 }
 
+pub fn vk_get_device_queue(device: VkDevice, queue_family_index: u32, queue_index: u32) -> VkQueue {
+    unsafe {
+        let mut queue: VkQueue = std::mem::zeroed();
+        vkGetDeviceQueue(device, queue_family_index, queue_index, &mut queue);
+        queue
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,

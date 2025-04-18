@@ -9,13 +9,13 @@ use glfw_bindings::{
 use vulkan_bindings::{
     VkApplicationInfo, VkDevice, VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkInstance,
     VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
     vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_physical_device_features,
+    vk_get_available_layer_properties, vk_get_device_queue, vk_get_physical_device_features,
     vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_supported_extensions, vk_make_api_version, vk_make_version,
 };
@@ -29,6 +29,7 @@ pub struct App {
     vk_instance: Option<VkInstance>,
     vk_physical_device: Option<VkPhysicalDevice>,
     vk_logical_device: Option<VkDevice>,
+    vk_queue: Option<VkQueue>,
 }
 
 impl App {
@@ -188,6 +189,12 @@ impl App {
                 Ok(device) => Some(device),
                 Err(err) => panic!("Failed to create logical device: {:?}", err),
             };
+
+        self.vk_queue = Some(vk_get_device_queue(
+            self.vk_logical_device.unwrap(),
+            queue_family_indices.graphics_family.unwrap(),
+            0,
+        ));
     }
     // GLFW FUNCTIONS
 
