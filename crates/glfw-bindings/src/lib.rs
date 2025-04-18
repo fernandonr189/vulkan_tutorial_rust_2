@@ -3,6 +3,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(improper_ctypes)]
 
+use vulkan_bindings::{
+    self, VkAllocationCallbacks, VkInstance, VkInternalAllocationType, VkPhysicalDevice, VkResult,
+    VkResult_VK_SUCCESS, VkSurfaceKHR, VkSystemAllocationScope,
+};
+
 use std::{
     ffi::{CString, c_char},
     ptr::null_mut,
@@ -80,8 +85,25 @@ pub fn glfw_get_required_instance_extensions() -> Result<(u32, *const *const i8)
     Ok((count, extensions))
 }
 
+pub fn glfw_create_window_surface(
+    instance: VkInstance,
+    window: &mut GLFWwindow,
+) -> Result<VkSurfaceKHR, GlfwError> {
+    unsafe {
+        let mut surface: VkSurfaceKHR = std::mem::zeroed();
+        let result = glfwCreateWindowSurface(instance, window, null_mut(), &mut surface);
+
+        if result != VkResult_VK_SUCCESS {
+            Err(GlfwError::CreateWindowSurfaceError)
+        } else {
+            Ok(surface)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum GlfwError {
     CreateWindowError,
     InstanceExtensionsError,
+    CreateWindowSurfaceError,
 }

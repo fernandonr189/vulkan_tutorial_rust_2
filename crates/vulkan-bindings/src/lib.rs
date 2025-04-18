@@ -44,6 +44,12 @@ pub fn vk_destroy_device(device: VkDevice) {
     };
 }
 
+pub fn vk_destroy_surface_khr(instance: VkInstance, surface: VkSurfaceKHR) {
+    unsafe {
+        vkDestroySurfaceKHR(instance, surface, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {

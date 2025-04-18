@@ -3,8 +3,8 @@ use std::ffi::c_char;
 use ffi_utils::StringFfi;
 use glfw_bindings::{
     self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
-    glfw_destroy_window, glfw_get_required_instance_extensions, glfw_init, glfw_poll_events,
-    glfw_terminate, glfw_window_hint, glfw_window_should_close,
+    glfw_create_window_surface, glfw_destroy_window, glfw_get_required_instance_extensions,
+    glfw_init, glfw_poll_events, glfw_terminate, glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
     VkApplicationInfo, VkDevice, VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkInstance,
@@ -13,11 +13,12 @@ use vulkan_bindings::{
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, vk_create_instance,
-    vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_device_queue, vk_get_physical_device_features,
-    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
-    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
+    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, VkSurfaceKHR, vk_create_instance,
+    vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr,
+    vk_get_available_devices, vk_get_available_layer_properties, vk_get_device_queue,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_physical_device_queue_family_properties, vk_get_supported_extensions,
+    vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -30,6 +31,7 @@ pub struct App {
     vk_physical_device: Option<VkPhysicalDevice>,
     vk_logical_device: Option<VkDevice>,
     vk_queue: Option<VkQueue>,
+    vk_surface_khr: Option<VkSurfaceKHR>,
 }
 
 impl App {
@@ -45,6 +47,7 @@ impl App {
         self.vk_create_instance();
         self.vk_pick_physical_device();
         self.vk_create_logical_device();
+        self.glfw_create_surface();
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -198,6 +201,14 @@ impl App {
     }
     // GLFW FUNCTIONS
 
+    fn glfw_create_surface(self: &mut Self) {
+        self.vk_surface_khr =
+            match glfw_create_window_surface(self.vk_instance.unwrap(), &mut self.window.unwrap()) {
+                Ok(surface) => Some(surface),
+                Err(err) => panic!("Failed to create surface: {:?}", err),
+            }
+    }
+
     fn init_window(self: &mut Self) {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -215,6 +226,7 @@ impl App {
     }
 
     fn cleanup(self: &mut Self) {
+        vk_destroy_surface_khr(self.vk_instance.unwrap(), self.vk_surface_khr.unwrap());
         vk_destroy_instance(self.vk_instance.unwrap());
         vk_destroy_device(self.vk_logical_device.unwrap());
         glfw_destroy_window(&mut self.window.unwrap());

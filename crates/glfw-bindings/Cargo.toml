@@ -8,6 +8,7 @@ bindgen = "0.71.1"
 
 [dependencies]
 ffi-utils = { path = "../ffi-utils" }
+vulkan-bindings = { path = "../vulkan-bindings" }
 
 [lib]
 path = "src/lib.rs"
