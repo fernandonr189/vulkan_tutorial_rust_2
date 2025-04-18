@@ -226,10 +226,16 @@ impl App {
     }
 
     fn cleanup(self: &mut Self) {
-        vk_destroy_surface_khr(self.vk_instance.unwrap(), self.vk_surface_khr.unwrap());
-        vk_destroy_instance(self.vk_instance.unwrap());
-        vk_destroy_device(self.vk_logical_device.unwrap());
-        glfw_destroy_window(&mut self.window.unwrap());
+        if self.vk_instance.is_some() && self.vk_surface_khr.is_some() {
+            vk_destroy_surface_khr(self.vk_instance.unwrap(), self.vk_surface_khr.unwrap());
+            vk_destroy_instance(self.vk_instance.unwrap());
+        }
+        if self.vk_logical_device.is_some() {
+            vk_destroy_device(self.vk_logical_device.unwrap());
+        }
+        if self.window.is_some() {
+            glfw_destroy_window(&mut self.window.unwrap());
+        }
         glfw_terminate();
     }
 }
