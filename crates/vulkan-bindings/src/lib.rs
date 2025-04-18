@@ -182,6 +182,24 @@ pub fn vk_get_device_queue(device: VkDevice, queue_family_index: u32, queue_inde
     }
 }
 
+pub fn vk_get_physical_device_surface_support_khr(
+    physical_device: VkPhysicalDevice,
+    index: u32,
+    surface: VkSurfaceKHR,
+) -> Result<bool, VulkanError> {
+    unsafe {
+        let mut supported: VkBool32 = std::mem::zeroed();
+        let result =
+            vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, index, surface, &mut supported);
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDetermineSurfaceSupport);
+        }
+
+        Ok(supported == 1)
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -190,4 +208,5 @@ pub enum VulkanError {
     CouldNotEnumerateDevices,
     CouldNotGetDeviceQueueFamilyProperties,
     CouldNotCreateLogicalDevice,
+    CouldNotDetermineSurfaceSupport,
 }

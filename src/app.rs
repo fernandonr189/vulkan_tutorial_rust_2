@@ -17,8 +17,8 @@ use vulkan_bindings::{
     vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr,
     vk_get_available_devices, vk_get_available_layer_properties, vk_get_device_queue,
     vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties, vk_get_supported_extensions,
-    vk_make_api_version, vk_make_version,
+    vk_get_physical_device_queue_family_properties, vk_get_physical_device_surface_support_khr,
+    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -45,9 +45,9 @@ impl App {
 
     fn init_vulkan(self: &mut Self) {
         self.vk_create_instance();
+        self.glfw_create_surface();
         self.vk_pick_physical_device();
         self.vk_create_logical_device();
-        self.glfw_create_surface();
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -152,7 +152,25 @@ impl App {
         for (i, queue_family) in queue_families.iter().enumerate() {
             if queue_family.queueFlags & VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT != 0 {
                 indices.graphics_family = Some(i as u32);
+            }
+
+            let surface_support = match vk_get_physical_device_surface_support_khr(
+                device,
+                i as u32,
+                self.vk_surface_khr.unwrap(),
+            ) {
+                Ok(supported) => supported,
+                Err(err) => panic!("Failed to get surface support: {:?}", err),
+            };
+
+            if surface_support {
+                indices.present_family = Some(i as u32);
+            }
+
+            if indices.is_complete() {
                 break;
+            } else {
+                indices.clear();
             }
         }
         indices
@@ -249,4 +267,15 @@ impl Drop for App {
 #[derive(Default)]
 pub struct QueueFamilyIndices {
     graphics_family: Option<u32>,
+    present_family: Option<u32>,
+}
+
+impl QueueFamilyIndices {
+    pub fn is_complete(&self) -> bool {
+        self.graphics_family.is_some() && self.present_family.is_some()
+    }
+    pub fn clear(&mut self) {
+        self.graphics_family = None;
+        self.present_family = None;
+    }
 }
