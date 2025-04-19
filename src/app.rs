@@ -9,17 +9,19 @@ use glfw_bindings::{
 use vulkan_bindings::{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkQueue,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, VkSurfaceKHR, vk_create_instance,
-    vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr,
-    vk_get_available_devices, vk_get_available_layer_properties,
-    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
-    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
-    vk_get_physical_device_surface_support_khr, vk_get_supported_extensions, vk_make_api_version,
-    vk_make_version,
+    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, VkSurfaceCapabilitiesKHR,
+    VkSurfaceFormatKHR, VkSurfaceKHR, vk_create_instance, vk_create_logical_device,
+    vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr, vk_get_available_devices,
+    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_physical_device_queue_family_properties,
+    vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
+    vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
+    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -138,11 +140,16 @@ impl App {
 
         let queue_family_indices = self.vk_find_queue_families(device);
 
+        let extensions_supported = self.vk_check_device_extension_support(device);
+
+        let swapchain_support_details = self.vk_query_swapchain_support(device);
+
         return device_properties.deviceType
             == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
             && device_features.geometryShader == 1
             && queue_family_indices.is_complete()
-            && self.vk_check_device_extension_support(device);
+            && extensions_supported
+            && swapchain_support_details.is_swapchain_adequate();
     }
 
     fn vk_check_device_extension_support(self: &mut Self, device: VkPhysicalDevice) -> bool {
@@ -263,6 +270,39 @@ impl App {
             0,
         ));
     }
+
+    fn vk_query_swapchain_support(
+        self: &mut Self,
+        device: VkPhysicalDevice,
+    ) -> SwapChainSupportDetails {
+        let surface_capabilities = match vk_get_physical_device_surface_capabilities_khr(
+            device,
+            self.vk_surface_khr.unwrap(),
+        ) {
+            Ok(capabilities) => capabilities,
+            Err(err) => panic!("Failed to query swapchain support: {:?}", err),
+        };
+        let mut swapchain_support_details = SwapChainSupportDetails::new(surface_capabilities);
+
+        swapchain_support_details.formats = match vk_get_physical_device_surface_formats_khr(
+            device,
+            self.vk_surface_khr.unwrap(),
+        ) {
+            Ok(formats) => formats,
+            Err(err) => panic!("Failed to query swapchain formats: {:?}", err),
+        };
+
+        swapchain_support_details.present_modes =
+            match vk_get_physical_device_surface_present_modes_khr(
+                device,
+                self.vk_surface_khr.unwrap(),
+            ) {
+                Ok(present_modes) => present_modes,
+                Err(err) => panic!("Failed to query swapchain present modes: {:?}", err),
+            };
+        swapchain_support_details
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -311,7 +351,7 @@ impl Drop for App {
 }
 
 #[derive(Default)]
-pub struct QueueFamilyIndices {
+struct QueueFamilyIndices {
     graphics_family: Option<u32>,
     present_family: Option<u32>,
 }
@@ -319,5 +359,24 @@ pub struct QueueFamilyIndices {
 impl QueueFamilyIndices {
     pub fn is_complete(&self) -> bool {
         self.graphics_family.is_some() && self.present_family.is_some()
+    }
+}
+
+struct SwapChainSupportDetails {
+    capabilities: VkSurfaceCapabilitiesKHR,
+    formats: Vec<VkSurfaceFormatKHR>,
+    present_modes: Vec<VkPresentModeKHR>,
+}
+
+impl SwapChainSupportDetails {
+    pub fn new(capabilities: VkSurfaceCapabilitiesKHR) -> Self {
+        Self {
+            capabilities,
+            formats: Vec::new(),
+            present_modes: Vec::new(),
+        }
+    }
+    pub fn is_swapchain_adequate(&self) -> bool {
+        !self.formats.is_empty() && !self.present_modes.is_empty()
     }
 }

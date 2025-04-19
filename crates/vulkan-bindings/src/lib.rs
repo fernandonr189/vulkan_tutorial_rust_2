@@ -229,6 +229,87 @@ pub fn vk_get_physical_device_surface_support_khr(
     }
 }
 
+pub fn vk_get_physical_device_surface_capabilities_khr(
+    physical_device: VkPhysicalDevice,
+    surface: VkSurfaceKHR,
+) -> Result<VkSurfaceCapabilitiesKHR, VulkanError> {
+    unsafe {
+        let mut capabilities: VkSurfaceCapabilitiesKHR = std::mem::zeroed();
+        let result =
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &mut capabilities);
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDetermineSurfaceCapabilities);
+        }
+
+        Ok(capabilities)
+    }
+}
+
+pub fn vk_get_physical_device_surface_formats_khr(
+    device: VkPhysicalDevice,
+    surface: VkSurfaceKHR,
+) -> Result<Vec<VkSurfaceFormatKHR>, VulkanError> {
+    unsafe {
+        let mut format_count: u32 = 0;
+        let mut result =
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &mut format_count, null_mut());
+
+        if format_count == 0 || result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDeterminaSurfaceFormats);
+        };
+
+        let mut available_formats: Vec<VkSurfaceFormatKHR> =
+            vec![std::mem::zeroed(); format_count as usize];
+
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+            device,
+            surface,
+            &mut format_count,
+            available_formats.as_mut_ptr(),
+        );
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDeterminaSurfaceFormats);
+        };
+        Ok(available_formats)
+    }
+}
+
+pub fn vk_get_physical_device_surface_present_modes_khr(
+    device: VkPhysicalDevice,
+    surface: VkSurfaceKHR,
+) -> Result<Vec<VkPresentModeKHR>, VulkanError> {
+    unsafe {
+        let mut present_mode_count: u32 = 0;
+        let mut result = vkGetPhysicalDeviceSurfacePresentModesKHR(
+            device,
+            surface,
+            &mut present_mode_count,
+            null_mut(),
+        );
+
+        if present_mode_count == 0 || result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDetermineSurfacePresentModes);
+        };
+
+        let mut available_present_modes: Vec<VkPresentModeKHR> =
+            vec![std::mem::zeroed(); present_mode_count as usize];
+
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(
+            device,
+            surface,
+            &mut present_mode_count,
+            available_present_modes.as_mut_ptr(),
+        );
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotDetermineSurfacePresentModes);
+        };
+        Ok(available_present_modes)
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -239,4 +320,7 @@ pub enum VulkanError {
     CouldNotCreateLogicalDevice,
     CouldNotDetermineSurfaceSupport,
     CouldNotEnumerateDeviceExtensionProperties,
+    CouldNotDetermineSurfaceCapabilities,
+    CouldNotDeterminaSurfaceFormats,
+    CouldNotDetermineSurfacePresentModes,
 }
