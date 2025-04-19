@@ -25,9 +25,10 @@ use vulkan_bindings::{
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
-    VkPipelineShaderStageCreateInfo, VkPresentModeKHR, VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR,
-    VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR, VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT,
-    VkShaderModule, VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo, VkPresentModeKHR,
+    VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
+    VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
+    VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -36,6 +37,7 @@ use vulkan_bindings::{
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
@@ -542,6 +544,12 @@ impl App {
             .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
         dynamic_state_create_info.set_p_dynamic_states(&dynamic_states);
         dynamic_state_create_info.set_dynamic_state_count(dynamic_states.len() as u32);
+
+        let mut vertex_input_info = VkPipelineVertexInputStateCreateInfo::default();
+        vertex_input_info
+            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
+        vertex_input_info.set_vertex_binding_description_count(0);
+        vertex_input_info.set_vertex_attribute_description_count(0);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
