@@ -15,23 +15,27 @@ use glfw_bindings::{
 use vulkan_bindings::{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo,
     VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkExtent2D, VkFormat, VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkImage,
-    VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkInstance, VkInstanceCreateInfo,
-    VkPhysicalDevice, VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR,
+    VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
+    VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
-    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_instance,
-    vk_create_logical_device, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_instance,
-    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties,
+    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
+    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_swapchain_khr,
+    vk_destroy_device, vk_destroy_image_view, vk_destroy_instance, vk_destroy_surface_khr,
+    vk_destroy_swapchain_khr, vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -52,6 +56,7 @@ pub struct App {
     vk_present_queue: Option<VkQueue>,
     vk_swap_chain: Option<VkSwapchainKHR>,
     vk_swap_chain_images: Vec<VkImage>,
+    vk_swap_chain_image_views: Vec<VkImageView>,
     vk_swap_chain_image_format: Option<VkFormat>,
     vk_swap_chain_image_extent: Option<VkExtent2D>,
 }
@@ -71,6 +76,7 @@ impl App {
         self.vk_pick_physical_device();
         self.vk_create_logical_device();
         self.vk_create_swap_chain();
+        self.vk_create_image_views();
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -441,6 +447,38 @@ impl App {
         }
     }
 
+    fn vk_create_image_views(self: &mut Self) {
+        for swapchain_image in &self.vk_swap_chain_images {
+            let mut image_view_create_info = VkImageViewCreateInfo::default();
+            image_view_create_info
+                .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
+            image_view_create_info.set_image(*swapchain_image);
+            image_view_create_info.set_view_type(VkImageViewType_VK_IMAGE_VIEW_TYPE_2D);
+            image_view_create_info.set_format(self.vk_swap_chain_image_format.unwrap());
+            image_view_create_info.set_components(
+                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+            );
+            image_view_create_info.set_subresource_range(
+                VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+                0,
+                1,
+                0,
+                1,
+            );
+
+            self.vk_swap_chain_image_views.push(
+                match vk_create_image_view(self.vk_logical_device.unwrap(), image_view_create_info)
+                {
+                    Ok(image_view) => image_view,
+                    Err(err) => panic!("Failed to create image view: {:?}", err),
+                },
+            );
+        }
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -468,6 +506,9 @@ impl App {
     }
 
     fn cleanup(&mut self) {
+        for image_view in self.vk_swap_chain_image_views.iter() {
+            vk_destroy_image_view(self.vk_logical_device.unwrap(), *image_view);
+        }
         if let (Some(device), Some(swapchain)) =
             (self.vk_logical_device.take(), self.vk_swap_chain.take())
         {
@@ -485,7 +526,6 @@ impl App {
         if let Some(window) = self.window.take() {
             glfw_destroy_window(window);
         }
-
         glfw_terminate();
     }
 }

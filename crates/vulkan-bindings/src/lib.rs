@@ -56,6 +56,12 @@ pub fn vk_destroy_swapchain_khr(device: VkDevice, swapchain: VkSwapchainKHR) {
     }
 }
 
+pub fn vk_destroy_image_view(device: VkDevice, image_view: VkImageView) {
+    unsafe {
+        vkDestroyImageView(device, image_view, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -356,6 +362,21 @@ pub fn vk_get_swapchain_images_khr(
     }
 }
 
+pub fn vk_create_image_view(
+    device: VkDevice,
+    image_view_create_info: VkImageViewCreateInfo,
+) -> Result<VkImageView, VulkanError> {
+    unsafe {
+        let mut image_view: VkImageView = std::mem::zeroed();
+        let result = vkCreateImageView(device, &image_view_create_info, null(), &mut image_view);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateImageView)
+        } else {
+            Ok(image_view)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -371,4 +392,5 @@ pub enum VulkanError {
     CouldNotDetermineSurfacePresentModes,
     CouldNotCreateSwapchain,
     CouldNotGetSwapchainImages,
+    CouldNotCreateImageView,
 }
