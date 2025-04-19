@@ -62,6 +62,12 @@ pub fn vk_destroy_image_view(device: VkDevice, image_view: VkImageView) {
     }
 }
 
+pub fn vk_destroy_shader_module(device: VkDevice, shader_module: VkShaderModule) {
+    unsafe {
+        vkDestroyShaderModule(device, shader_module, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -377,6 +383,26 @@ pub fn vk_create_image_view(
     }
 }
 
+pub fn vk_create_shader_module(
+    device: VkDevice,
+    shader_module_create_info: VkShaderModuleCreateInfo,
+) -> Result<VkShaderModule, VulkanError> {
+    unsafe {
+        let mut shader_module: VkShaderModule = std::mem::zeroed();
+        let result = vkCreateShaderModule(
+            device,
+            &shader_module_create_info,
+            null(),
+            &mut shader_module,
+        );
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateShaderModule)
+        } else {
+            Ok(shader_module)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -393,4 +419,5 @@ pub enum VulkanError {
     CouldNotCreateSwapchain,
     CouldNotGetSwapchainImages,
     CouldNotCreateImageView,
+    CouldNotCreateShaderModule,
 }

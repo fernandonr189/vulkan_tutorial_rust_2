@@ -21,19 +21,24 @@ use vulkan_bindings::{
     VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR,
-    VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
-    VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineShaderStageCreateInfo,
+    VkPresentModeKHR, VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR,
+    VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR, VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT,
+    VkShaderModule, VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_swapchain_khr,
-    vk_destroy_device, vk_destroy_image_view, vk_destroy_instance, vk_destroy_surface_khr,
-    vk_destroy_swapchain_khr, vk_get_available_devices, vk_get_available_layer_properties,
+    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_shader_module,
+    vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view, vk_destroy_instance,
+    vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
+    vk_get_available_devices, vk_get_available_layer_properties,
     vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
     vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
@@ -44,6 +49,8 @@ use vulkan_bindings::{
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
 static VALIDATION_LAYERS: &[&str] = &["VK_LAYER_KHRONOS_validation"];
 static REQUIRED_EXTENSIONS: &[&[u8]] = &[VK_KHR_SWAPCHAIN_EXTENSION_NAME];
+const VERT_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shader.vert.spv"));
+const FRAG_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shader.frag.spv"));
 
 #[derive(Default)]
 pub struct App {
@@ -77,6 +84,7 @@ impl App {
         self.vk_create_logical_device();
         self.vk_create_swap_chain();
         self.vk_create_image_views();
+        self.vk_create_graphics_pipeline();
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -477,6 +485,45 @@ impl App {
                 },
             );
         }
+    }
+
+    fn vk_create_shader_module(self: &mut Self, code: &[u8]) -> VkShaderModule {
+        let mut shader_create_info = VkShaderModuleCreateInfo::default();
+        shader_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
+        shader_create_info.set_code_size(code.len());
+        shader_create_info.set_p_code(code.as_ptr() as *const u32);
+
+        match vk_create_shader_module(self.vk_logical_device.unwrap(), shader_create_info) {
+            Ok(shader_module) => shader_module,
+            Err(err) => panic!("Failed to create shader module: {:?}", err),
+        }
+    }
+
+    fn vk_create_graphics_pipeline(self: &mut Self) {
+        println!("Vertex shader size: {}", VERT_SHADER.len());
+        println!("Fragment shader size: {}", FRAG_SHADER.len());
+
+        let vertex_shader_module = self.vk_create_shader_module(VERT_SHADER);
+        let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER);
+
+        let mut vert_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
+        vert_shader_stage_create_info
+            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
+        vert_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT);
+        vert_shader_stage_create_info.set_module(vertex_shader_module);
+        vert_shader_stage_create_info.set_p_name("main".as_ptr());
+
+        let mut frag_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
+        frag_shader_stage_create_info
+            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
+        frag_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT);
+        frag_shader_stage_create_info.set_module(fragment_shader_module);
+        frag_shader_stage_create_info.set_p_name("main".as_ptr());
+
+        let shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
+
+        vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
+        vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
     }
 
     // GLFW FUNCTIONS
