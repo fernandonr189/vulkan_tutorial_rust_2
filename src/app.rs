@@ -16,7 +16,7 @@ use vulkan_bindings::{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo,
     VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VkDevice, VkDeviceCreateInfo,
-    VkDeviceQueueCreateInfo, VkExtent2D, VkFormat_VK_FORMAT_B8G8R8A8_SRGB,
+    VkDeviceQueueCreateInfo, VkExtent2D, VkFormat, VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkImage,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkInstance, VkInstanceCreateInfo,
     VkPhysicalDevice, VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
@@ -34,7 +34,7 @@ use vulkan_bindings::{
     vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
-    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
+    vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -51,6 +51,9 @@ pub struct App {
     vk_graphics_queue: Option<VkQueue>,
     vk_present_queue: Option<VkQueue>,
     vk_swap_chain: Option<VkSwapchainKHR>,
+    vk_swap_chain_images: Vec<VkImage>,
+    vk_swap_chain_image_format: Option<VkFormat>,
+    vk_swap_chain_image_extent: Option<VkExtent2D>,
 }
 
 impl App {
@@ -68,7 +71,6 @@ impl App {
         self.vk_pick_physical_device();
         self.vk_create_logical_device();
         self.vk_create_swap_chain();
-        panic!("Swapchain creation failed");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -376,6 +378,17 @@ impl App {
                 Ok(swap_chain) => Some(swap_chain),
                 Err(err) => panic!("Failed to create swap chain: {:?}", err),
             };
+
+        self.vk_swap_chain_images = match vk_get_swapchain_images_khr(
+            self.vk_logical_device.unwrap(),
+            self.vk_swap_chain.unwrap(),
+        ) {
+            Ok(images) => images,
+            Err(err) => panic!("Failed to get swap chain images: {:?}", err),
+        };
+
+        self.vk_swap_chain_image_format = Some(surface_format.format);
+        self.vk_swap_chain_image_extent = Some(extent);
     }
 
     fn vk_choose_swap_surface_format(

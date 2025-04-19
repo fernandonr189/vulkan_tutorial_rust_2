@@ -332,6 +332,30 @@ pub fn vk_create_swapchain_khr(
     }
 }
 
+pub fn vk_get_swapchain_images_khr(
+    device: VkDevice,
+    swapchain: VkSwapchainKHR,
+) -> Result<Vec<VkImage>, VulkanError> {
+    unsafe {
+        let mut image_count: u32 = 0;
+        let result = vkGetSwapchainImagesKHR(device, swapchain, &mut image_count, null_mut());
+
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotGetSwapchainImages)
+        } else {
+            let mut images: Vec<VkImage> = vec![std::mem::zeroed(); image_count as usize];
+            let result =
+                vkGetSwapchainImagesKHR(device, swapchain, &mut image_count, images.as_mut_ptr());
+
+            if result != VkResult_VK_SUCCESS {
+                Err(VulkanError::CouldNotGetSwapchainImages)
+            } else {
+                Ok(images)
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -346,4 +370,5 @@ pub enum VulkanError {
     CouldNotDeterminaSurfaceFormats,
     CouldNotDetermineSurfacePresentModes,
     CouldNotCreateSwapchain,
+    CouldNotGetSwapchainImages,
 }
