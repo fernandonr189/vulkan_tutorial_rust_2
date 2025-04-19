@@ -7,22 +7,24 @@ use glfw_bindings::{
     glfw_init, glfw_poll_events, glfw_terminate, glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VkApplicationInfo, VkDevice, VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkInstance,
-    VkInstanceCreateInfo, VkPhysicalDevice,
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkDevice, VkDeviceCreateInfo,
+    VkDeviceQueueCreateInfo, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, VkSurfaceKHR, vk_create_instance,
     vk_create_logical_device, vk_destroy_device, vk_destroy_instance, vk_destroy_surface_khr,
-    vk_get_available_devices, vk_get_available_layer_properties, vk_get_device_queue,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties, vk_get_physical_device_surface_support_khr,
-    vk_get_supported_extensions, vk_make_api_version, vk_make_version,
+    vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
+    vk_get_physical_device_surface_support_khr, vk_get_supported_extensions, vk_make_api_version,
+    vk_make_version,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
 static VALIDATION_LAYERS: &[&str] = &["VK_LAYER_KHRONOS_validation"];
+static REQUIRED_EXTENSIONS: &[&[u8]] = &[VK_KHR_SWAPCHAIN_EXTENSION_NAME];
 
 #[derive(Default)]
 pub struct App {
@@ -139,7 +141,32 @@ impl App {
         return device_properties.deviceType
             == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
             && device_features.geometryShader == 1
-            && queue_family_indices.graphics_family.is_some();
+            && queue_family_indices.is_complete()
+            && self.vk_check_device_extension_support(device);
+    }
+
+    fn vk_check_device_extension_support(self: &mut Self, device: VkPhysicalDevice) -> bool {
+        let extensions = match vk_get_device_extensions_properties(device) {
+            Ok(extensions) => extensions,
+            Err(_) => todo!(),
+        };
+
+        let required_extensions: Vec<StringFfi> = REQUIRED_EXTENSIONS
+            .iter()
+            .map(|s| StringFfi::from_u8_array(*s))
+            .collect();
+
+        let mut required_extensions_set: HashSet<StringFfi> = HashSet::new();
+
+        for extension in required_extensions {
+            required_extensions_set.insert(extension);
+        }
+
+        for extension in extensions {
+            required_extensions_set.remove(&StringFfi::from_i8_array(&extension.extensionName));
+        }
+
+        required_extensions_set.is_empty()
     }
 
     fn vk_find_queue_families(self: &mut Self, device: VkPhysicalDevice) -> QueueFamilyIndices {

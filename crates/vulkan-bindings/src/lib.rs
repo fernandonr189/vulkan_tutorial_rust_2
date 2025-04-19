@@ -159,6 +159,35 @@ pub fn vk_get_physical_device_queue_family_properties(
     }
 }
 
+pub fn vk_get_device_extensions_properties(
+    device: VkPhysicalDevice,
+) -> Result<Vec<VkExtensionProperties>, VulkanError> {
+    unsafe {
+        let mut extension_count: u32 = 0;
+        let mut result =
+            vkEnumerateDeviceExtensionProperties(device, null(), &mut extension_count, null_mut());
+
+        if extension_count == 0 || result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotEnumerateDeviceExtensionProperties);
+        };
+
+        let mut available_extensions: Vec<VkExtensionProperties> =
+            vec![std::mem::zeroed(); extension_count as usize];
+
+        result = vkEnumerateDeviceExtensionProperties(
+            device,
+            null(),
+            &mut extension_count,
+            available_extensions.as_mut_ptr(),
+        );
+
+        if result != VkResult_VK_SUCCESS {
+            return Err(VulkanError::CouldNotEnumerateDeviceExtensionProperties);
+        };
+        Ok(available_extensions)
+    }
+}
+
 pub fn vk_create_logical_device(
     physical_device: VkPhysicalDevice,
     create_info: &VkDeviceCreateInfo,
@@ -209,4 +238,5 @@ pub enum VulkanError {
     CouldNotGetDeviceQueueFamilyProperties,
     CouldNotCreateLogicalDevice,
     CouldNotDetermineSurfaceSupport,
+    CouldNotEnumerateDeviceExtensionProperties,
 }

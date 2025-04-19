@@ -3,7 +3,7 @@ use std::{
     fmt::Display,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub struct StringFfi {
     c_string: CString,
 }
@@ -26,6 +26,15 @@ impl StringFfi {
     }
 
     pub fn from_i8_array(arr: &[i8]) -> Self {
+        let len = arr.iter().position(|&c| c == 0).unwrap_or(arr.len());
+        let slice = &arr[..len];
+        let bytes: Vec<u8> = slice.iter().map(|&c| c as u8).collect();
+        let string = String::from_utf8_lossy(&bytes).to_string();
+        let c_string = CString::new(string.clone()).unwrap();
+        Self { c_string }
+    }
+
+    pub fn from_u8_array(arr: &[u8]) -> Self {
         let len = arr.iter().position(|&c| c == 0).unwrap_or(arr.len());
         let slice = &arr[..len];
         let bytes: Vec<u8> = slice.iter().map(|&c| c as u8).collect();
