@@ -33,4 +33,7 @@ impl VkDeviceCreateInfo {
     pub fn set_pp_enabled_layer_names(&mut self, enabled_layer_names: *const *const i8) {
         self.ppEnabledLayerNames = enabled_layer_names;
     }
+    pub fn set_pp_enabled_extension_names(&mut self, enabled_extension_names: *const *const u8) {
+        self.ppEnabledExtensionNames = enabled_extension_names as *const *const i8;
+    }
 }

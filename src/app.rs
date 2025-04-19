@@ -221,13 +221,17 @@ impl App {
             queue_create_infos.push(queue_create_info);
         }
 
+        let extension_names: Vec<*const u8> =
+            REQUIRED_EXTENSIONS.iter().map(|s| s.as_ptr()).collect();
+
         let mut device_create_info = VkDeviceCreateInfo::default();
         let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
         device_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
         device_create_info.set_p_queue_create_infos(queue_create_infos.as_ptr());
         device_create_info.set_queue_create_info_count(queue_create_infos.len() as u32);
         device_create_info.set_p_enabled_features(&device_features);
-        device_create_info.set_enabled_extension_count(0);
+        device_create_info.set_enabled_extension_count(extension_names.len() as u32);
+        device_create_info.set_pp_enabled_extension_names(extension_names.as_ptr());
 
         if DEBUG_ENABLED {
             let strings_ffi: Vec<StringFfi> = VALIDATION_LAYERS
