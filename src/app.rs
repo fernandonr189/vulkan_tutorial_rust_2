@@ -3,6 +3,8 @@ use std::{
     collections::HashSet,
     ffi::c_char,
     ptr::null_mut,
+    thread::sleep,
+    time::Duration,
 };
 
 use ffi_utils::StringFfi;
@@ -17,12 +19,13 @@ use vulkan_bindings::{
     VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
     VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VkDevice, VkDeviceCreateInfo,
-    VkDeviceQueueCreateInfo, VkExtent2D, VkFormat, VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkImage,
-    VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
+    VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
+    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkImage, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineShaderStageCreateInfo,
-    VkPresentModeKHR, VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
+    VkPipelineShaderStageCreateInfo, VkPresentModeKHR, VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR,
     VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR, VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT,
     VkShaderModule, VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
@@ -31,6 +34,7 @@ use vulkan_bindings::{
     VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
@@ -164,6 +168,12 @@ impl App {
         if self.vk_physical_device.is_none() {
             panic!("No suitable devices found!")
         }
+
+        let device_properties = vk_get_physical_device_properties(self.vk_physical_device.unwrap());
+        println!(
+            "Device Name: {}",
+            StringFfi::from_i8_array(&device_properties.deviceName).to_string()
+        );
     }
 
     fn vk_is_device_suitable(self: &mut Self, device: VkPhysicalDevice) -> bool {
@@ -522,6 +532,17 @@ impl App {
 
         let shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
 
+        let dynamic_states: Vec<VkDynamicState> = vec![
+            VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT,
+            VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
+        ];
+
+        let mut dynamic_state_create_info = VkPipelineDynamicStateCreateInfo::default();
+        dynamic_state_create_info
+            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
+        dynamic_state_create_info.set_p_dynamic_states(&dynamic_states);
+        dynamic_state_create_info.set_dynamic_state_count(dynamic_states.len() as u32);
+
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
     }
@@ -549,6 +570,7 @@ impl App {
     fn main_loop(self: &mut Self) {
         while !glfw_window_should_close(self.window.unwrap()) {
             glfw_poll_events();
+            sleep(Duration::from_millis(16));
         }
     }
 
