@@ -30,7 +30,7 @@ static REQUIRED_EXTENSIONS: &[&[u8]] = &[VK_KHR_SWAPCHAIN_EXTENSION_NAME];
 
 #[derive(Default)]
 pub struct App {
-    window: Option<GLFWwindow>,
+    window: Option<*mut GLFWwindow>,
     vk_instance: Option<VkInstance>,
     vk_physical_device: Option<VkPhysicalDevice>,
     vk_logical_device: Option<VkDevice>,
@@ -307,7 +307,7 @@ impl App {
 
     fn glfw_create_surface(self: &mut Self) {
         self.vk_surface_khr =
-            match glfw_create_window_surface(self.vk_instance.unwrap(), &mut self.window.unwrap()) {
+            match glfw_create_window_surface(self.vk_instance.unwrap(), self.window.unwrap()) {
                 Ok(surface) => Some(surface),
                 Err(err) => panic!("Failed to create surface: {:?}", err),
             }
@@ -324,22 +324,27 @@ impl App {
     }
 
     fn main_loop(self: &mut Self) {
-        while !glfw_window_should_close(&mut self.window.unwrap()) {
+        while !glfw_window_should_close(self.window.unwrap()) {
             glfw_poll_events();
         }
     }
 
-    fn cleanup(self: &mut Self) {
-        if self.vk_instance.is_some() && self.vk_surface_khr.is_some() {
-            vk_destroy_surface_khr(self.vk_instance.unwrap(), self.vk_surface_khr.unwrap());
-            vk_destroy_instance(self.vk_instance.unwrap());
+    fn cleanup(&mut self) {
+        if let (Some(instance), Some(surface)) =
+            (self.vk_instance.take(), self.vk_surface_khr.take())
+        {
+            vk_destroy_surface_khr(instance, surface);
+            vk_destroy_instance(instance);
         }
-        if self.vk_logical_device.is_some() {
-            vk_destroy_device(self.vk_logical_device.unwrap());
+
+        if let Some(device) = self.vk_logical_device.take() {
+            vk_destroy_device(device);
         }
-        if self.window.is_some() {
-            glfw_destroy_window(&mut self.window.unwrap());
+
+        if let Some(window) = self.window.take() {
+            glfw_destroy_window(window);
         }
+
         glfw_terminate();
     }
 }
