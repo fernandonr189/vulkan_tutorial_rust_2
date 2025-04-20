@@ -27,13 +27,14 @@ use vulkan_bindings::{
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
-    VkPipelineInputAssemblyStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
-    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo,
-    VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
+    VkPipelineInputAssemblyStateCreateInfo, VkPipelineMultisampleStateCreateInfo,
+    VkPipelineRasterizationStateCreateInfo, VkPipelineShaderStageCreateInfo,
+    VkPipelineVertexInputStateCreateInfo, VkPipelineViewportStateCreateInfo,
+    VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
-    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
-    VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT,
+    VkShaderModule, VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR,
     VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_image_view,
@@ -561,6 +562,14 @@ impl App {
             .set_depth_bias_constant_factor(0.0)
             .set_depth_bias_clamp(0.0)
             .set_depth_bias_slope_factor(0.0);
+
+        let mut multisample_create_info = VkPipelineMultisampleStateCreateInfo::default();
+        multisample_create_info
+            .set_sample_shading_enable(false as u32)
+            .set_rasterization_samples(VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT)
+            .set_min_sample_shading(1.0)
+            .set_alpha_to_coverage_enable(false as u32)
+            .set_alpha_to_one_enable(false as u32);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
