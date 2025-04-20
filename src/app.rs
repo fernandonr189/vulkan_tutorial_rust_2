@@ -369,6 +369,7 @@ impl App {
             .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
         swapchain_create_info.set_surface(self.vk_surface_khr.unwrap());
         swapchain_create_info.set_min_image_count(image_count);
+        swapchain_create_info.set_image_format(surface_format.format);
         swapchain_create_info.set_image_color_space(surface_format.colorSpace);
         swapchain_create_info.set_image_extent(extent);
         swapchain_create_info.set_image_array_layers(1);
