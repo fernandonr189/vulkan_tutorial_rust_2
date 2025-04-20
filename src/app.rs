@@ -26,7 +26,7 @@ use vulkan_bindings::{
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
     VkPipelineInputAssemblyStateCreateInfo, VkPipelineShaderStageCreateInfo,
-    VkPipelineVertexInputStateCreateInfo, VkPresentModeKHR,
+    VkPipelineVertexInputStateCreateInfo, VkPipelineViewportStateCreateInfo, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
@@ -540,6 +540,11 @@ impl App {
         input_assembly_info
             .set_topology(VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .set_primitive_restart_enable(false as u32);
+
+        let mut viewport_state_info = VkPipelineViewportStateCreateInfo::default();
+        viewport_state_info
+            .set_viewport_count(0)
+            .set_scissor_count(0);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
