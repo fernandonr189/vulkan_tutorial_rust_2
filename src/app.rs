@@ -47,10 +47,11 @@ use vulkan_bindings::{
     VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_image_view,
     vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
     vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view,
-    vk_destroy_instance, vk_destroy_shader_module, vk_destroy_surface_khr,
-    vk_destroy_swapchain_khr, vk_get_available_devices, vk_get_available_layer_properties,
-    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
-    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
+    vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_shader_module,
+    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
+    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -647,27 +648,41 @@ impl App {
     }
 
     fn cleanup(&mut self) {
-        for image_view in self.vk_swap_chain_image_views.iter() {
-            vk_destroy_image_view(self.vk_logical_device.unwrap(), *image_view);
-        }
-        if let (Some(device), Some(swapchain)) =
-            (self.vk_logical_device.take(), self.vk_swap_chain.take())
-        {
-            vk_destroy_swapchain_khr(device, swapchain);
-            vk_destroy_device(device);
-        }
+        let mut device = self.vk_logical_device.take();
 
+        if let (Some(pipeline_layout), Some(d)) = (self.vk_pipeline_layout.take(), device) {
+            vk_destroy_pipeline_layout(d, pipeline_layout);
+            println!("Pipeline layout destroyed");
+            device = Some(d);
+        }
+        if let Some(d) = device {
+            for (i, &image_view) in self.vk_swap_chain_image_views.iter().enumerate() {
+                if !image_view.is_null() {
+                    vk_destroy_image_view(d, image_view);
+                    println!("Image view destroyed: {}", i);
+                }
+            }
+            if let Some(swapchain) = self.vk_swap_chain.take() {
+                vk_destroy_swapchain_khr(d, swapchain);
+                println!("Swapchain destroyed");
+            }
+            vk_destroy_device(d);
+            println!("Device destroyed");
+        }
         if let (Some(instance), Some(surface)) =
             (self.vk_instance.take(), self.vk_surface_khr.take())
         {
             vk_destroy_surface_khr(instance, surface);
+            println!("Surface destroyed");
             vk_destroy_instance(instance);
+            println!("Instance destroyed");
         }
-
         if let Some(window) = self.window.take() {
             glfw_destroy_window(window);
+            println!("Window destroyed");
         }
         glfw_terminate();
+        println!("Application terminated");
     }
 }
 

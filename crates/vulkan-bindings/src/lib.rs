@@ -69,6 +69,12 @@ pub fn vk_destroy_shader_module(device: VkDevice, shader_module: VkShaderModule)
     }
 }
 
+pub fn vk_destroy_pipeline_layout(device: VkDevice, pipeline_layout: VkPipelineLayout) {
+    unsafe {
+        vkDestroyPipelineLayout(device, pipeline_layout, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
