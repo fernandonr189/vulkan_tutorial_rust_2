@@ -1,10 +1,10 @@
 use crate::{
     VkPipelineViewportStateCreateInfo, VkRect2D,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, VkViewport,
-    create_vk_builder,
+    create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineViewportStateCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
     set_viewport_count => viewportCount: u32,

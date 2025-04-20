@@ -1,9 +1,9 @@
 use crate::{
     VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkPhysicalDeviceFeatures,
-    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, create_vk_builder,
+    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkDeviceCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     set_p_queue_create_infos => pQueueCreateInfos: *const VkDeviceQueueCreateInfo => null,

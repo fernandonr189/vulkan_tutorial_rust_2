@@ -1,9 +1,10 @@
 use crate::{
     VkBool32, VkCullModeFlags, VkFrontFace, VkPipelineRasterizationStateCreateInfo, VkPolygonMode,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, create_vk_builder,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+    create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineRasterizationStateCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
     set_polygon_mode => polygonMode: VkPolygonMode,

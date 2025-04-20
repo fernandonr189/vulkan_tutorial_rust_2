@@ -1,10 +1,10 @@
 use crate::{
     VkPipelineVertexInputStateCreateInfo,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-    VkVertexInputBindingDescription, create_vk_builder,
+    VkVertexInputBindingDescription, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineVertexInputStateCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     set_vertex_binding_description_count => vertexBindingDescriptionCount: u32,

@@ -384,6 +384,26 @@ pub fn vk_create_image_view(
     }
 }
 
+pub fn vk_create_pipeline_layout(
+    device: VkDevice,
+    pipeline_layout_create_info: VkPipelineLayoutCreateInfo,
+) -> Result<VkPipelineLayout, VulkanError> {
+    unsafe {
+        let mut pipeline_layout: VkPipelineLayout = std::mem::zeroed();
+        let result = vkCreatePipelineLayout(
+            device,
+            &pipeline_layout_create_info,
+            null(),
+            &mut pipeline_layout,
+        );
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreatePipelineLayout)
+        } else {
+            Ok(pipeline_layout)
+        }
+    }
+}
+
 pub fn vk_create_shader_module(
     device: VkDevice,
     shader_module_create_info: VkShaderModuleCreateInfo,
@@ -421,4 +441,5 @@ pub enum VulkanError {
     CouldNotGetSwapchainImages,
     CouldNotCreateImageView,
     CouldNotCreateShaderModule,
+    CouldNotCreatePipelineLayout,
 }

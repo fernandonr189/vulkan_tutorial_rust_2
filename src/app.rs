@@ -15,7 +15,12 @@ use glfw_bindings::{
     glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo,
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkBlendFactor_VK_BLEND_FACTOR_ONE,
+    VkBlendFactor_VK_BLEND_FACTOR_ZERO, VkBlendOp_VK_BLEND_OP_ADD,
+    VkColorComponentFlagBits_VK_COLOR_COMPONENT_A_BIT,
+    VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT,
+    VkColorComponentFlagBits_VK_COLOR_COMPONENT_G_BIT,
+    VkColorComponentFlagBits_VK_COLOR_COMPONENT_R_BIT,
     VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
     VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -25,12 +30,14 @@ use vulkan_bindings::{
     VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkImage,
     VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
-    VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
-    VkPipelineInputAssemblyStateCreateInfo, VkPipelineMultisampleStateCreateInfo,
-    VkPipelineRasterizationStateCreateInfo, VkPipelineShaderStageCreateInfo,
-    VkPipelineVertexInputStateCreateInfo, VkPipelineViewportStateCreateInfo,
-    VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
+    VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo,
+    VkLogicOp_VK_LOGIC_OP_COPY, VkPhysicalDevice,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineColorBlendAttachmentState,
+    VkPipelineColorBlendStateCreateInfo, VkPipelineDynamicStateCreateInfo,
+    VkPipelineInputAssemblyStateCreateInfo, VkPipelineLayout, VkPipelineLayoutCreateInfo,
+    VkPipelineMultisampleStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
+    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo,
+    VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT,
@@ -38,12 +45,12 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR,
     VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_image_view,
-    vk_create_instance, vk_create_logical_device, vk_create_shader_module, vk_create_swapchain_khr,
-    vk_destroy_device, vk_destroy_image_view, vk_destroy_instance, vk_destroy_shader_module,
-    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties,
+    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
+    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view,
+    vk_destroy_instance, vk_destroy_shader_module, vk_destroy_surface_khr,
+    vk_destroy_swapchain_khr, vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -69,6 +76,7 @@ pub struct App {
     vk_swap_chain_image_views: Vec<VkImageView>,
     vk_swap_chain_image_format: Option<VkFormat>,
     vk_swap_chain_image_extent: Option<VkExtent2D>,
+    vk_pipeline_layout: Option<VkPipelineLayout>,
 }
 
 impl App {
@@ -570,6 +578,42 @@ impl App {
             .set_min_sample_shading(1.0)
             .set_alpha_to_coverage_enable(false as u32)
             .set_alpha_to_one_enable(false as u32);
+
+        let mut color_blend_attachment = VkPipelineColorBlendAttachmentState::default();
+        color_blend_attachment
+            .set_color_write_mask(
+                VkColorComponentFlagBits_VK_COLOR_COMPONENT_R_BIT
+                    | VkColorComponentFlagBits_VK_COLOR_COMPONENT_G_BIT
+                    | VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT
+                    | VkColorComponentFlagBits_VK_COLOR_COMPONENT_A_BIT,
+            )
+            .set_blend_enable(false as u32)
+            .set_src_blend_color_factor(VkBlendFactor_VK_BLEND_FACTOR_ONE)
+            .set_dst_blend_color_factor(VkBlendFactor_VK_BLEND_FACTOR_ZERO)
+            .set_color_blend_op(VkBlendOp_VK_BLEND_OP_ADD)
+            .set_src_blend_alpha_factor(VkBlendFactor_VK_BLEND_FACTOR_ONE)
+            .set_dst_blend_alpha_factor(VkBlendFactor_VK_BLEND_FACTOR_ZERO)
+            .set_alpha_blend_op(VkBlendOp_VK_BLEND_OP_ADD);
+
+        let mut color_blending = VkPipelineColorBlendStateCreateInfo::default();
+        color_blending
+            .set_logic_op_enable(false as u32)
+            .set_logic_op(VkLogicOp_VK_LOGIC_OP_COPY)
+            .set_attachment_count(1)
+            .set_p_attachments(&color_blend_attachment);
+
+        let mut pipeline_layout_info = VkPipelineLayoutCreateInfo::default();
+        pipeline_layout_info
+            .set_layout_count(0)
+            .set_push_constant_range_count(0);
+
+        self.vk_pipeline_layout = match vk_create_pipeline_layout(
+            self.vk_logical_device.unwrap(),
+            pipeline_layout_info,
+        ) {
+            Ok(layout) => Some(layout),
+            Err(err) => panic!("Failed to create pipeline layout: {:?}", err),
+        };
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);

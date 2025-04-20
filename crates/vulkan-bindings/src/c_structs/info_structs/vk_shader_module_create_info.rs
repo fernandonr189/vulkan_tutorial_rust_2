@@ -1,9 +1,9 @@
 use crate::{
     VkShaderModuleCreateInfo, VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-    create_vk_builder,
+    create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkShaderModuleCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
     set_code_size => codeSize: usize,

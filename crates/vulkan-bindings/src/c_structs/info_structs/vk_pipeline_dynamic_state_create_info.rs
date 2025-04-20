@@ -1,9 +1,9 @@
 use crate::{
     VkDynamicState, VkPipelineDynamicStateCreateInfo,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, create_vk_builder,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineDynamicStateCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     set_dynamic_state_count => dynamicStateCount: u32,

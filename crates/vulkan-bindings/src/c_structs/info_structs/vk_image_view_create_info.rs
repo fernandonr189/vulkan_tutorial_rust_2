@@ -1,9 +1,9 @@
 use crate::{
     VkComponentMapping, VkFormat, VkImage, VkImageSubresourceRange, VkImageViewCreateInfo,
-    VkImageViewType, VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, create_vk_builder,
+    VkImageViewType, VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkImageViewCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     set_image => image: VkImage,

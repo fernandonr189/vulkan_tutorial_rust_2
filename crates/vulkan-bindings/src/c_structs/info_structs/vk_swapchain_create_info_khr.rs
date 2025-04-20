@@ -2,10 +2,10 @@ use crate::{
     VkColorSpaceKHR, VkCompositeAlphaFlagBitsKHR, VkExtent2D, VkFormat, VkImageUsageFlags,
     VkPresentModeKHR, VkSharingMode, VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
     VkSurfaceKHR, VkSurfaceTransformFlagBitsKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    create_vk_builder,
+    create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkSwapchainCreateInfoKHR,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
     set_surface => surface: VkSurfaceKHR,

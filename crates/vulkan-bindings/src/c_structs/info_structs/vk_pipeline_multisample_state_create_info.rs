@@ -1,9 +1,9 @@
 use crate::{
     VkPipelineMultisampleStateCreateInfo, VkSampleCountFlagBits,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, create_vk_builder,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineMultisampleStateCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
     set_sample_shading_enable => sampleShadingEnable: u32,

@@ -1,7 +1,7 @@
-use crate::create_vk_builder;
+use crate::create_info_builder;
 use crate::{VkApplicationInfo, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO};
 
-create_vk_builder!(
+create_info_builder!(
     VkApplicationInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
     set_p_application_name => pApplicationName: *const i8 => null,

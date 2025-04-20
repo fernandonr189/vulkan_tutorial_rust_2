@@ -1,9 +1,9 @@
 use crate::{
     VkPipelineShaderStageCreateInfo, VkShaderModule, VkShaderStageFlagBits,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, create_vk_builder,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, create_info_builder,
 };
 
-create_vk_builder!(
+create_info_builder!(
     VkPipelineShaderStageCreateInfo,
     s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
     set_stage => stage: VkShaderStageFlagBits,
