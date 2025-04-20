@@ -25,9 +25,11 @@ use vulkan_bindings::{
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
-    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo, VkPresentModeKHR,
+    VkPipelineInputAssemblyStateCreateInfo, VkPipelineShaderStageCreateInfo,
+    VkPipelineVertexInputStateCreateInfo, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
-    VkQueue, VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
+    VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
     VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -36,6 +38,7 @@ use vulkan_bindings::{
     VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -551,6 +554,13 @@ impl App {
             .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
         vertex_input_info.set_vertex_binding_description_count(0);
         vertex_input_info.set_vertex_attribute_description_count(0);
+
+        let mut input_assembly_info = VkPipelineInputAssemblyStateCreateInfo::default();
+        input_assembly_info.set_s_type(
+            VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        );
+        input_assembly_info.set_topology(VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        input_assembly_info.set_primitive_restart_enable(false);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
