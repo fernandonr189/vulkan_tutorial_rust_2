@@ -18,15 +18,18 @@ use vulkan_bindings::{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo,
     VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
     VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
-    VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VkDevice, VkDeviceCreateInfo,
+    VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
     VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
-    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkImage, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkImage,
+    VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineDynamicStateCreateInfo,
-    VkPipelineInputAssemblyStateCreateInfo, VkPipelineShaderStageCreateInfo,
-    VkPipelineVertexInputStateCreateInfo, VkPipelineViewportStateCreateInfo, VkPresentModeKHR,
+    VkPipelineInputAssemblyStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
+    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo,
+    VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
@@ -545,6 +548,19 @@ impl App {
         viewport_state_info
             .set_viewport_count(0)
             .set_scissor_count(0);
+
+        let mut rasterizer_create_info = VkPipelineRasterizationStateCreateInfo::default();
+        rasterizer_create_info
+            .set_depth_clamp_enable(false as u32)
+            .set_rasterizer_discard_enable(false as u32)
+            .set_polygon_mode(VkPolygonMode_VK_POLYGON_MODE_FILL)
+            .set_line_width(1.0)
+            .set_cull_mode(VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT)
+            .set_front_face(VkFrontFace_VK_FRONT_FACE_CLOCKWISE)
+            .set_depth_bias_enable(false as u32)
+            .set_depth_bias_constant_factor(0.0)
+            .set_depth_bias_clamp(0.0)
+            .set_depth_bias_slope_factor(0.0);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
