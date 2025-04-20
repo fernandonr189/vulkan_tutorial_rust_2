@@ -1,19 +1,19 @@
 use crate::{
     VK_FALSE, VK_TRUE, VkColorSpaceKHR, VkCompositeAlphaFlagBitsKHR, VkExtent2D, VkFormat,
-    VkImageUsageFlags, VkPresentModeKHR, VkSharingMode, VkStructureType, VkSurfaceKHR,
+    VkImageUsageFlags, VkPresentModeKHR, VkSharingMode,
+    VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceKHR,
     VkSurfaceTransformFlagBitsKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
 };
 
 impl Default for VkSwapchainCreateInfoKHR {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkSwapchainCreateInfoKHR = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        info
     }
 }
 
 impl VkSwapchainCreateInfoKHR {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_surface(&mut self, surface: VkSurfaceKHR) {
         self.surface = surface;
     }

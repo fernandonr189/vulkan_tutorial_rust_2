@@ -32,24 +32,14 @@ use vulkan_bindings::{
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkShaderModule, VkShaderModuleCreateInfo,
     VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
-    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-    VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, VkSurfaceCapabilitiesKHR,
-    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_shader_module,
-    vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view, vk_destroy_instance,
-    vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
-    vk_get_available_devices, vk_get_available_layer_properties,
-    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
-    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
+    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR,
+    VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_image_view,
+    vk_create_instance, vk_create_logical_device, vk_create_shader_module, vk_create_swapchain_khr,
+    vk_destroy_device, vk_destroy_image_view, vk_destroy_instance, vk_destroy_shader_module,
+    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
+    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -101,7 +91,6 @@ impl App {
             panic!("Validation layers not available");
         }
         let mut app_info = VkApplicationInfo::default();
-        app_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_APPLICATION_INFO);
         app_info.set_p_application_name("Hello Triangle");
         app_info.set_application_version(vk_make_version(1, 0, 0));
         app_info.set_p_engine_name("No Engine");
@@ -111,7 +100,6 @@ impl App {
         let (extension_count, extensions) = glfw_get_required_instance_extensions()
             .expect("Could not get glfw required extensions");
         let mut instance_create_info = VkInstanceCreateInfo::default();
-        instance_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO);
         instance_create_info.set_p_application_info(&app_info);
         instance_create_info.set_enabled_extension_count(extension_count);
         instance_create_info.set_pp_enabled_extension_names(extensions);
@@ -267,8 +255,6 @@ impl App {
         let priority = 1.0;
         for family in unique_families {
             let mut queue_create_info = VkDeviceQueueCreateInfo::default();
-            queue_create_info
-                .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO);
             queue_create_info.set_queue_family_index(family);
             queue_create_info.set_queue_count(1);
             queue_create_info.set_p_queue_priorities(&[priority]);
@@ -280,7 +266,6 @@ impl App {
 
         let mut device_create_info = VkDeviceCreateInfo::default();
         let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
-        device_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO);
         device_create_info.set_p_queue_create_infos(queue_create_infos.as_ptr());
         device_create_info.set_queue_create_info_count(queue_create_infos.len() as u32);
         device_create_info.set_p_enabled_features(&device_features);
@@ -368,8 +353,6 @@ impl App {
         }
 
         let mut swapchain_create_info = VkSwapchainCreateInfoKHR::default();
-        swapchain_create_info
-            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR);
         swapchain_create_info.set_surface(self.vk_surface_khr.unwrap());
         swapchain_create_info.set_min_image_count(image_count);
         swapchain_create_info.set_image_format(surface_format.format);
@@ -474,8 +457,6 @@ impl App {
     fn vk_create_image_views(self: &mut Self) {
         for swapchain_image in &self.vk_swap_chain_images {
             let mut image_view_create_info = VkImageViewCreateInfo::default();
-            image_view_create_info
-                .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
             image_view_create_info.set_image(*swapchain_image);
             image_view_create_info.set_view_type(VkImageViewType_VK_IMAGE_VIEW_TYPE_2D);
             image_view_create_info.set_format(self.vk_swap_chain_image_format.unwrap());
@@ -505,7 +486,6 @@ impl App {
 
     fn vk_create_shader_module(self: &mut Self, code: &[u8]) -> VkShaderModule {
         let mut shader_create_info = VkShaderModuleCreateInfo::default();
-        shader_create_info.set_s_type(VkStructureType_VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO);
         shader_create_info.set_code_size(code.len());
         shader_create_info.set_p_code(code.as_ptr() as *const u32);
 
@@ -523,15 +503,11 @@ impl App {
         let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER);
 
         let mut vert_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
-        vert_shader_stage_create_info
-            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         vert_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT);
         vert_shader_stage_create_info.set_module(vertex_shader_module);
         vert_shader_stage_create_info.set_p_name("main".as_ptr());
 
         let mut frag_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
-        frag_shader_stage_create_info
-            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
         frag_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT);
         frag_shader_stage_create_info.set_module(fragment_shader_module);
         frag_shader_stage_create_info.set_p_name("main".as_ptr());
@@ -544,21 +520,14 @@ impl App {
         ];
 
         let mut dynamic_state_create_info = VkPipelineDynamicStateCreateInfo::default();
-        dynamic_state_create_info
-            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO);
         dynamic_state_create_info.set_p_dynamic_states(&dynamic_states);
         dynamic_state_create_info.set_dynamic_state_count(dynamic_states.len() as u32);
 
         let mut vertex_input_info = VkPipelineVertexInputStateCreateInfo::default();
-        vertex_input_info
-            .set_s_type(VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
         vertex_input_info.set_vertex_binding_description_count(0);
         vertex_input_info.set_vertex_attribute_description_count(0);
 
         let mut input_assembly_info = VkPipelineInputAssemblyStateCreateInfo::default();
-        input_assembly_info.set_s_type(
-            VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        );
         input_assembly_info.set_topology(VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
         input_assembly_info.set_primitive_restart_enable(false);
 

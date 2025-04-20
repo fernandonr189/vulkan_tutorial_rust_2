@@ -1,15 +1,17 @@
-use crate::{VkPipelineInputAssemblyStateCreateInfo, VkPrimitiveTopology, VkStructureType};
+use crate::{
+    VkPipelineInputAssemblyStateCreateInfo, VkPrimitiveTopology,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+};
 
 impl Default for VkPipelineInputAssemblyStateCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkPipelineInputAssemblyStateCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        info
     }
 }
 
 impl VkPipelineInputAssemblyStateCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_topology(&mut self, topology: VkPrimitiveTopology) {
         self.topology = topology;
     }

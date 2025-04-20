@@ -1,15 +1,17 @@
-use crate::{VkDynamicState, VkPipelineDynamicStateCreateInfo, VkStructureType};
+use crate::{
+    VkDynamicState, VkPipelineDynamicStateCreateInfo,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+};
 
 impl Default for VkPipelineDynamicStateCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkPipelineDynamicStateCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        info
     }
 }
 
 impl VkPipelineDynamicStateCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_dynamic_state_count(&mut self, count: u32) {
         self.dynamicStateCount = count;
     }

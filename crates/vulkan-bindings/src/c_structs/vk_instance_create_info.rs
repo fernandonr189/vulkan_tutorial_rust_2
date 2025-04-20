@@ -1,15 +1,16 @@
-use crate::{VkApplicationInfo, VkInstanceCreateInfo, VkStructureType};
+use crate::{
+    VkApplicationInfo, VkInstanceCreateInfo, VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+};
 
 impl Default for VkInstanceCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkInstanceCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        info
     }
 }
 
 impl VkInstanceCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_p_application_info(&mut self, application_info: &VkApplicationInfo) {
         self.pApplicationInfo = application_info as *const VkApplicationInfo;
     }

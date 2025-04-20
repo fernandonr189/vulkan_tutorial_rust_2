@@ -1,17 +1,17 @@
 use crate::{
-    VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkPhysicalDeviceFeatures, VkStructureType,
+    VkDeviceCreateInfo, VkDeviceQueueCreateInfo, VkPhysicalDeviceFeatures,
+    VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 };
 
 impl Default for VkDeviceCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkDeviceCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        info
     }
 }
 
 impl VkDeviceCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_p_queue_create_infos(
         &mut self,
         p_queue_create_infos: *const VkDeviceQueueCreateInfo,

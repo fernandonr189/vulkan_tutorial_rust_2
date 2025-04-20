@@ -1,18 +1,17 @@
 use crate::{
     VkComponentMapping, VkFormat, VkImage, VkImageSubresourceRange, VkImageViewCreateInfo,
-    VkImageViewType, VkStructureType,
+    VkImageViewType, VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 };
 
 impl Default for VkImageViewCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkImageViewCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        info
     }
 }
 
 impl VkImageViewCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_image(&mut self, image: VkImage) {
         self.image = image;
     }

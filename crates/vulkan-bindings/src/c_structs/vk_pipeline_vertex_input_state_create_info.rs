@@ -1,17 +1,18 @@
 use crate::{
-    VkPipelineVertexInputStateCreateInfo, VkStructureType, VkVertexInputBindingDescription,
+    VkPipelineVertexInputStateCreateInfo,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+    VkVertexInputBindingDescription,
 };
 
 impl Default for VkPipelineVertexInputStateCreateInfo {
     fn default() -> Self {
-        unsafe { std::mem::zeroed() }
+        let mut info: VkPipelineVertexInputStateCreateInfo = unsafe { std::mem::zeroed() };
+        info.sType = VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        info
     }
 }
 
 impl VkPipelineVertexInputStateCreateInfo {
-    pub fn set_s_type(&mut self, s_type: VkStructureType) {
-        self.sType = s_type;
-    }
     pub fn set_vertex_binding_description_count(&mut self, vertex_binding_description_count: u32) {
         self.vertexBindingDescriptionCount = vertex_binding_description_count;
     }
