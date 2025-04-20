@@ -8,6 +8,7 @@ use std::ptr::{null, null_mut};
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 mod c_structs;
+mod macros;
 
 pub fn vk_make_version(major: u32, minor: u32, patch: u32) -> u32 {
     (major << 22) | (minor << 12) | patch

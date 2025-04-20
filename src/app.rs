@@ -91,19 +91,21 @@ impl App {
             panic!("Validation layers not available");
         }
         let mut app_info = VkApplicationInfo::default();
-        app_info.set_p_application_name("Hello Triangle");
-        app_info.set_application_version(vk_make_version(1, 0, 0));
-        app_info.set_p_engine_name("No Engine");
-        app_info.set_engine_version(vk_make_version(1, 0, 0));
-        app_info.set_api_version(vk_make_api_version(0, 1, 0, 0));
+        app_info
+            .set_p_application_name("Hello Triangle".as_ptr() as *const i8)
+            .set_application_version(vk_make_version(1, 0, 0))
+            .set_p_engine_name("No Engine".as_ptr() as *const i8)
+            .set_engine_version(vk_make_version(1, 0, 0))
+            .set_api_version(vk_make_api_version(0, 1, 0, 0));
 
         let (extension_count, extensions) = glfw_get_required_instance_extensions()
             .expect("Could not get glfw required extensions");
         let mut instance_create_info = VkInstanceCreateInfo::default();
-        instance_create_info.set_p_application_info(&app_info);
-        instance_create_info.set_enabled_extension_count(extension_count);
-        instance_create_info.set_pp_enabled_extension_names(extensions);
-        instance_create_info.set_enabled_layer_count(0);
+        instance_create_info
+            .set_p_application_info(&app_info)
+            .set_enabled_extension_count(extension_count)
+            .set_pp_enabled_extension_names(extensions)
+            .set_enabled_layer_count(0);
 
         // TODO check supported extensions against required extensions
         let (_extension_count, _supported_extensions) = match vk_get_supported_extensions() {
@@ -255,22 +257,24 @@ impl App {
         let priority = 1.0;
         for family in unique_families {
             let mut queue_create_info = VkDeviceQueueCreateInfo::default();
-            queue_create_info.set_queue_family_index(family);
-            queue_create_info.set_queue_count(1);
-            queue_create_info.set_p_queue_priorities(&[priority]);
+            queue_create_info
+                .set_queue_family_index(family)
+                .set_queue_count(1)
+                .set_p_queue_priorities(&priority);
             queue_create_infos.push(queue_create_info);
         }
 
         let extension_names: Vec<*const u8> =
             REQUIRED_EXTENSIONS.iter().map(|s| s.as_ptr()).collect();
 
-        let mut device_create_info = VkDeviceCreateInfo::default();
         let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
-        device_create_info.set_p_queue_create_infos(queue_create_infos.as_ptr());
-        device_create_info.set_queue_create_info_count(queue_create_infos.len() as u32);
-        device_create_info.set_p_enabled_features(&device_features);
-        device_create_info.set_enabled_extension_count(extension_names.len() as u32);
-        device_create_info.set_pp_enabled_extension_names(extension_names.as_ptr());
+        let mut device_create_info = VkDeviceCreateInfo::default();
+        device_create_info
+            .set_p_queue_create_infos(queue_create_infos.as_ptr())
+            .set_queue_create_info_count(queue_create_infos.len() as u32)
+            .set_p_enabled_features(&device_features)
+            .set_enabled_extension_count(extension_names.len() as u32)
+            .set_pp_enabled_extension_names(extension_names.as_ptr() as *const *const i8);
 
         if DEBUG_ENABLED {
             let strings_ffi: Vec<StringFfi> = VALIDATION_LAYERS
@@ -353,38 +357,37 @@ impl App {
         }
 
         let mut swapchain_create_info = VkSwapchainCreateInfoKHR::default();
-        swapchain_create_info.set_surface(self.vk_surface_khr.unwrap());
-        swapchain_create_info.set_min_image_count(image_count);
-        swapchain_create_info.set_image_format(surface_format.format);
-        swapchain_create_info.set_image_color_space(surface_format.colorSpace);
-        swapchain_create_info.set_image_extent(extent);
-        swapchain_create_info.set_image_array_layers(1);
         swapchain_create_info
+            .set_surface(self.vk_surface_khr.unwrap())
+            .set_min_image_count(image_count)
+            .set_image_format(surface_format.format)
+            .set_image_color_space(surface_format.colorSpace)
+            .set_image_extent(extent)
+            .set_image_array_layers(1)
             .set_image_usage(VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
         let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+        let queue_family_indices_vec = vec![
+            queue_family_indices.graphics_family.unwrap(),
+            queue_family_indices.present_family.unwrap(),
+        ];
 
-        if queue_family_indices.graphics_family.unwrap()
-            != queue_family_indices.present_family.unwrap()
-        {
-            swapchain_create_info.set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_CONCURRENT);
-            swapchain_create_info.set_queue_family_index_count(2);
-            swapchain_create_info.set_p_queue_family_indices(&[
-                queue_family_indices.graphics_family.unwrap(),
-                queue_family_indices.present_family.unwrap(),
-            ]);
+        if queue_family_indices.are_equal() {
+            swapchain_create_info
+                .set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_CONCURRENT)
+                .set_queue_family_index_count(2)
+                .set_p_queue_family_indices(queue_family_indices_vec.as_ptr());
         } else {
-            swapchain_create_info.set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_EXCLUSIVE);
-            swapchain_create_info.set_queue_family_index_count(0);
-            swapchain_create_info.set_p_queue_family_indices(&[]);
+            swapchain_create_info
+                .set_image_sharing_mode(VkSharingMode_VK_SHARING_MODE_EXCLUSIVE)
+                .set_queue_family_index_count(0);
         }
         swapchain_create_info
-            .set_pre_transform(swapchain_support_details.capabilities.currentTransform);
-        swapchain_create_info
-            .set_composite_alpha(VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
-        swapchain_create_info.set_present_mode(present_mode);
-        swapchain_create_info.set_clipped(true);
-        swapchain_create_info.set_old_swapchain(null_mut());
+            .set_pre_transform(swapchain_support_details.capabilities.currentTransform)
+            .set_composite_alpha(VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+            .set_present_mode(present_mode)
+            .set_clipped(true as u32)
+            .set_old_swapchain(null_mut());
 
         self.vk_swap_chain =
             match vk_create_swapchain_khr(self.vk_logical_device.unwrap(), swapchain_create_info) {
@@ -457,22 +460,23 @@ impl App {
     fn vk_create_image_views(self: &mut Self) {
         for swapchain_image in &self.vk_swap_chain_images {
             let mut image_view_create_info = VkImageViewCreateInfo::default();
-            image_view_create_info.set_image(*swapchain_image);
-            image_view_create_info.set_view_type(VkImageViewType_VK_IMAGE_VIEW_TYPE_2D);
-            image_view_create_info.set_format(self.vk_swap_chain_image_format.unwrap());
-            image_view_create_info.set_components(
-                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
-                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
-                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
-                VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
-            );
-            image_view_create_info.set_subresource_range(
-                VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
-                0,
-                1,
-                0,
-                1,
-            );
+            image_view_create_info
+                .set_image(*swapchain_image)
+                .set_view_type(VkImageViewType_VK_IMAGE_VIEW_TYPE_2D)
+                .set_format(self.vk_swap_chain_image_format.unwrap())
+                .set_components(vulkan_bindings::VkComponentMapping {
+                    r: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                    g: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                    b: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                    a: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+                })
+                .set_subresource_range(vulkan_bindings::VkImageSubresourceRange {
+                    aspectMask: VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+                    baseMipLevel: 0,
+                    levelCount: 1,
+                    baseArrayLayer: 0,
+                    layerCount: 1,
+                });
 
             self.vk_swap_chain_image_views.push(
                 match vk_create_image_view(self.vk_logical_device.unwrap(), image_view_create_info)
@@ -486,8 +490,9 @@ impl App {
 
     fn vk_create_shader_module(self: &mut Self, code: &[u8]) -> VkShaderModule {
         let mut shader_create_info = VkShaderModuleCreateInfo::default();
-        shader_create_info.set_code_size(code.len());
-        shader_create_info.set_p_code(code.as_ptr() as *const u32);
+        shader_create_info
+            .set_code_size(code.len())
+            .set_p_code(code.as_ptr() as *const u32);
 
         match vk_create_shader_module(self.vk_logical_device.unwrap(), shader_create_info) {
             Ok(shader_module) => shader_module,
@@ -503,16 +508,18 @@ impl App {
         let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER);
 
         let mut vert_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
-        vert_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT);
-        vert_shader_stage_create_info.set_module(vertex_shader_module);
-        vert_shader_stage_create_info.set_p_name("main".as_ptr());
+        vert_shader_stage_create_info
+            .set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT)
+            .set_module(vertex_shader_module)
+            .set_p_name("main".as_ptr() as *const i8);
 
         let mut frag_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
-        frag_shader_stage_create_info.set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT);
-        frag_shader_stage_create_info.set_module(fragment_shader_module);
-        frag_shader_stage_create_info.set_p_name("main".as_ptr());
+        frag_shader_stage_create_info
+            .set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT)
+            .set_module(fragment_shader_module)
+            .set_p_name("main".as_ptr() as *const i8);
 
-        let shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
+        let _shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
 
         let dynamic_states: Vec<VkDynamicState> = vec![
             VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT,
@@ -520,16 +527,19 @@ impl App {
         ];
 
         let mut dynamic_state_create_info = VkPipelineDynamicStateCreateInfo::default();
-        dynamic_state_create_info.set_p_dynamic_states(&dynamic_states);
-        dynamic_state_create_info.set_dynamic_state_count(dynamic_states.len() as u32);
+        dynamic_state_create_info
+            .set_p_dynamic_states(dynamic_states.as_ptr())
+            .set_dynamic_state_count(dynamic_states.len() as u32);
 
         let mut vertex_input_info = VkPipelineVertexInputStateCreateInfo::default();
-        vertex_input_info.set_vertex_binding_description_count(0);
-        vertex_input_info.set_vertex_attribute_description_count(0);
+        vertex_input_info
+            .set_vertex_binding_description_count(0)
+            .set_vertex_attribute_description_count(0);
 
         let mut input_assembly_info = VkPipelineInputAssemblyStateCreateInfo::default();
-        input_assembly_info.set_topology(VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-        input_assembly_info.set_primitive_restart_enable(false);
+        input_assembly_info
+            .set_topology(VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+            .set_primitive_restart_enable(false as u32);
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
@@ -602,6 +612,9 @@ struct QueueFamilyIndices {
 impl QueueFamilyIndices {
     pub fn is_complete(&self) -> bool {
         self.graphics_family.is_some() && self.present_family.is_some()
+    }
+    pub fn are_equal(&self) -> bool {
+        self.graphics_family == self.present_family
     }
 }
 

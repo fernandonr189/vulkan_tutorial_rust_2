@@ -1,24 +1,12 @@
 use crate::{
     VkPipelineShaderStageCreateInfo, VkShaderModule, VkShaderStageFlagBits,
-    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, create_vk_builder,
 };
 
-impl Default for VkPipelineShaderStageCreateInfo {
-    fn default() -> Self {
-        let mut info: VkPipelineShaderStageCreateInfo = unsafe { std::mem::zeroed() };
-        info.sType = VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        info
-    }
-}
-
-impl VkPipelineShaderStageCreateInfo {
-    pub fn set_stage(&mut self, stage: VkShaderStageFlagBits) {
-        self.stage = stage;
-    }
-    pub fn set_module(&mut self, module: VkShaderModule) {
-        self.module = module;
-    }
-    pub fn set_p_name(&mut self, p_name: *const u8) {
-        self.pName = p_name as *const i8;
-    }
-}
+create_vk_builder!(
+    VkPipelineShaderStageCreateInfo,
+    s_type: VkStructureType_VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    set_stage => stage: VkShaderStageFlagBits,
+    set_module => module: VkShaderModule,
+    set_p_name => pName: *const i8 => null,
+);

@@ -1,26 +1,13 @@
 use crate::{
-    VkApplicationInfo, VkInstanceCreateInfo, VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    VkApplicationInfo, VkInstanceCreateInfo,
+    VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, create_vk_builder,
 };
 
-impl Default for VkInstanceCreateInfo {
-    fn default() -> Self {
-        let mut info: VkInstanceCreateInfo = unsafe { std::mem::zeroed() };
-        info.sType = VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        info
-    }
-}
-
-impl VkInstanceCreateInfo {
-    pub fn set_p_application_info(&mut self, application_info: &VkApplicationInfo) {
-        self.pApplicationInfo = application_info as *const VkApplicationInfo;
-    }
-    pub fn set_enabled_extension_count(&mut self, extension_count: u32) {
-        self.enabledExtensionCount = extension_count;
-    }
-    pub fn set_pp_enabled_extension_names(&mut self, extension_names_pp: *const *const i8) {
-        self.ppEnabledExtensionNames = extension_names_pp;
-    }
-    pub fn set_enabled_layer_count(&mut self, count: u32) {
-        self.enabledLayerCount = count;
-    }
-}
+create_vk_builder!(
+    VkInstanceCreateInfo,
+    s_type: VkStructureType_VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    set_p_application_info => pApplicationInfo: &VkApplicationInfo => null,
+    set_enabled_extension_count => enabledExtensionCount: u32,
+    set_pp_enabled_extension_names => ppEnabledExtensionNames: *const *const i8 => null,
+    set_enabled_layer_count => enabledLayerCount: u32,
+);
