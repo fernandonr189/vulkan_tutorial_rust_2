@@ -81,6 +81,12 @@ pub fn vk_destroy_render_pass(device: VkDevice, render_pass: VkRenderPass) {
     }
 }
 
+pub fn vk_destroy_graphics_pipeline(device: VkDevice, graphics_pipeline: VkPipeline) {
+    unsafe {
+        vkDestroyPipeline(device, graphics_pipeline, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
