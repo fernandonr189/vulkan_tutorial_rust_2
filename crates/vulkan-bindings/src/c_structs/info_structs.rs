@@ -1,6 +1,7 @@
 mod vk_application_info;
 mod vk_device_create_info;
 mod vk_device_queue_create_info;
+mod vk_graphics_pipeline_create_info;
 mod vk_image_view_create_info;
 mod vk_instance_create_info;
 mod vk_pipeline_color_blend_state_create_info;

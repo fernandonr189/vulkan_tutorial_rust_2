@@ -31,14 +31,14 @@ use vulkan_bindings::{
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
     VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
-    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkImage,
-    VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE,
+    VkGraphicsPipelineCreateInfo, VkImage, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageLayout_VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo,
     VkLogicOp_VK_LOGIC_OP_COPY, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipeline,
     VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS, VkPipelineColorBlendAttachmentState,
     VkPipelineColorBlendStateCreateInfo, VkPipelineDynamicStateCreateInfo,
     VkPipelineInputAssemblyStateCreateInfo, VkPipelineLayout, VkPipelineLayoutCreateInfo,
@@ -53,9 +53,10 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
-    vk_create_render_pass, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device,
-    vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
+    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view,
+    vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
     vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
     vk_get_available_devices, vk_get_available_layer_properties,
     vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
@@ -87,6 +88,7 @@ pub struct App {
     vk_swap_chain_image_extent: Option<VkExtent2D>,
     vk_render_pass: Option<VkRenderPass>,
     vk_pipeline_layout: Option<VkPipelineLayout>,
+    vk_graphics_pipeline: Option<VkPipeline>,
 }
 
 impl App {
@@ -100,13 +102,21 @@ impl App {
 
     fn init_vulkan(self: &mut Self) {
         self.vk_create_instance();
+        println!("Instance created");
         self.glfw_create_surface();
+        println!("Surface created");
         self.vk_pick_physical_device();
+        println!("Physical device picked");
         self.vk_create_logical_device();
+        println!("Logical device created");
         self.vk_create_swap_chain();
+        println!("Swap chain created");
         self.vk_create_image_views();
+        println!("Image views created");
         self.vk_create_render_pass();
+        println!("Render pass created");
         self.vk_create_graphics_pipeline();
+        println!("Graphics pipeline created");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -542,7 +552,7 @@ impl App {
             .set_module(fragment_shader_module)
             .set_p_name("main".as_ptr() as *const i8);
 
-        let _shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
+        let shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
 
         let dynamic_states: Vec<VkDynamicState> = vec![
             VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT,
@@ -624,6 +634,28 @@ impl App {
         ) {
             Ok(layout) => Some(layout),
             Err(err) => panic!("Failed to create pipeline layout: {:?}", err),
+        };
+
+        let mut pipeline_create_info = VkGraphicsPipelineCreateInfo::default();
+        pipeline_create_info
+            .set_stage_count(2)
+            .set_p_stages(shader_stages.as_ptr())
+            .set_p_vertex_input_state(&vertex_input_info)
+            .set_p_input_assembly_state(&input_assembly_info)
+            .set_p_viewport_state(&viewport_state_info)
+            .set_p_rasterization_state(&rasterizer_create_info)
+            .set_p_color_blend_state(&color_blending)
+            .set_p_dynamic_state(&dynamic_state_create_info)
+            .set_layout(self.vk_pipeline_layout.unwrap())
+            .set_render_pass(self.vk_render_pass.unwrap())
+            .set_subpass(0);
+
+        self.vk_graphics_pipeline = match vk_create_graphics_pipeline(
+            self.vk_logical_device.unwrap(),
+            pipeline_create_info,
+        ) {
+            Ok(pipeline) => Some(pipeline),
+            Err(err) => panic!("Failed to create graphics pipeline: {:?}", err),
         };
 
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);

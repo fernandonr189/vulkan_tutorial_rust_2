@@ -451,6 +451,28 @@ pub fn vk_create_shader_module(
     }
 }
 
+pub fn vk_create_graphics_pipeline(
+    device: VkDevice,
+    graphics_pipeline_create_info: VkGraphicsPipelineCreateInfo,
+) -> Result<VkPipeline, VulkanError> {
+    unsafe {
+        let mut pipeline: VkPipeline = std::mem::zeroed();
+        let result = vkCreateGraphicsPipelines(
+            device,
+            null_mut(),
+            1,
+            &graphics_pipeline_create_info,
+            null(),
+            &mut pipeline,
+        );
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateGraphicsPipeline)
+        } else {
+            Ok(pipeline)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -470,4 +492,5 @@ pub enum VulkanError {
     CouldNotCreateShaderModule,
     CouldNotCreatePipelineLayout,
     CouldNotCreateRenderPass,
+    CouldNotCreateGraphicsPipeline,
 }
