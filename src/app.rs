@@ -522,11 +522,29 @@ impl App {
     }
 
     fn vk_create_shader_module(self: &mut Self, code: &[u8]) -> VkShaderModule {
+        if code.len() % 4 != 0 {
+            panic!("Shader code size is not a multiple of 4: {}", code.len());
+        }
+        if code.len() < 20 {
+            panic!(
+                "Shader code is too small to be valid SPIR-V: {}",
+                code.len()
+            );
+        }
+        let word_count = code.len() / 4;
+        let mut code_u32 = Vec::with_capacity(word_count);
+        for i in 0..word_count {
+            let idx = i * 4;
+            let word = u32::from_le_bytes([code[idx], code[idx + 1], code[idx + 2], code[idx + 3]]);
+            code_u32.push(word);
+        }
+        if code_u32[0] != 0x07230203 {
+            panic!("Invalid SPIR-V magic number: {:x}", code_u32[0]);
+        }
         let mut shader_create_info = VkShaderModuleCreateInfo::default();
         shader_create_info
             .set_code_size(code.len())
-            .set_p_code(code.as_ptr() as *const u32);
-
+            .set_p_code(code_u32.as_ptr());
         match vk_create_shader_module(self.vk_logical_device.unwrap(), shader_create_info) {
             Ok(shader_module) => shader_module,
             Err(err) => panic!("Failed to create shader module: {:?}", err),
@@ -540,17 +558,19 @@ impl App {
         let vertex_shader_module = self.vk_create_shader_module(VERT_SHADER);
         let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER);
 
+        let shaders_entry_point = StringFfi::from_string("main");
+
         let mut vert_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
         vert_shader_stage_create_info
             .set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT)
             .set_module(vertex_shader_module)
-            .set_p_name("main".as_ptr() as *const i8);
+            .set_p_name(shaders_entry_point.as_ptr());
 
         let mut frag_shader_stage_create_info = VkPipelineShaderStageCreateInfo::default();
         frag_shader_stage_create_info
             .set_stage(VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT)
             .set_module(fragment_shader_module)
-            .set_p_name("main".as_ptr() as *const i8);
+            .set_p_name(shaders_entry_point.as_ptr());
 
         let shader_stages = [vert_shader_stage_create_info, frag_shader_stage_create_info];
 
@@ -644,6 +664,7 @@ impl App {
             .set_p_input_assembly_state(&input_assembly_info)
             .set_p_viewport_state(&viewport_state_info)
             .set_p_rasterization_state(&rasterizer_create_info)
+            .set_p_multisample_state(&multisample_create_info)
             .set_p_color_blend_state(&color_blending)
             .set_p_dynamic_state(&dynamic_state_create_info)
             .set_layout(self.vk_pipeline_layout.unwrap())
