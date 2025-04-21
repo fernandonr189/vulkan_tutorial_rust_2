@@ -15,7 +15,11 @@ use glfw_bindings::{
     glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkBlendFactor_VK_BLEND_FACTOR_ONE,
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkAttachmentDescription,
+    VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR,
+    VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_DONT_CARE, VkAttachmentReference,
+    VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_STORE, VkBlendFactor_VK_BLEND_FACTOR_ONE,
     VkBlendFactor_VK_BLEND_FACTOR_ZERO, VkBlendOp_VK_BLEND_OP_ADD,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_A_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT,
@@ -29,10 +33,13 @@ use vulkan_bindings::{
     VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
     VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkImage,
     VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkImageLayout_VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo,
     VkLogicOp_VK_LOGIC_OP_COPY, VkPhysicalDevice,
-    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipelineColorBlendAttachmentState,
+    VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+    VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS, VkPipelineColorBlendAttachmentState,
     VkPipelineColorBlendStateCreateInfo, VkPipelineDynamicStateCreateInfo,
     VkPipelineInputAssemblyStateCreateInfo, VkPipelineLayout, VkPipelineLayoutCreateInfo,
     VkPipelineMultisampleStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
@@ -40,18 +47,19 @@ use vulkan_bindings::{
     VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
-    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT,
-    VkShaderModule, VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRenderPass, VkRenderPassCreateInfo,
+    VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkShaderModule, VkShaderModuleCreateInfo,
+    VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
-    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR,
-    VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_create_image_view,
-    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
-    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_image_view,
-    vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_shader_module,
-    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties,
+    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
+    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
+    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
+    vk_create_render_pass, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device,
+    vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
+    vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
+    vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -77,6 +85,7 @@ pub struct App {
     vk_swap_chain_image_views: Vec<VkImageView>,
     vk_swap_chain_image_format: Option<VkFormat>,
     vk_swap_chain_image_extent: Option<VkExtent2D>,
+    vk_render_pass: Option<VkRenderPass>,
     vk_pipeline_layout: Option<VkPipelineLayout>,
 }
 
@@ -96,6 +105,7 @@ impl App {
         self.vk_create_logical_device();
         self.vk_create_swap_chain();
         self.vk_create_image_views();
+        self.vk_create_render_pass();
         self.vk_create_graphics_pipeline();
     }
 
@@ -620,6 +630,43 @@ impl App {
         vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
     }
 
+    fn vk_create_render_pass(self: &mut Self) {
+        let mut color_attachment = VkAttachmentDescription::default();
+        color_attachment
+            .set_format(self.vk_swap_chain_image_format.unwrap())
+            .set_samples(VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT)
+            .set_load_op(VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR)
+            .set_store_op(VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_STORE)
+            .set_stencil_load_op(VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+            .set_stencil_store_op(VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_DONT_CARE)
+            .set_initial_layout(VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED)
+            .set_final_layout(VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        let mut color_attachment_ref = VkAttachmentReference::default();
+        color_attachment_ref
+            .set_attachment(0)
+            .set_layout(VkImageLayout_VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+        let mut subpass_description = VkSubpassDescription::default();
+        subpass_description
+            .set_pipeline_bind_point(VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS)
+            .set_color_attachment_count(1)
+            .set_p_color_attachments(&color_attachment_ref);
+
+        let mut render_pass_info = VkRenderPassCreateInfo::default();
+        render_pass_info
+            .set_attachment_count(1)
+            .set_p_attachments(&color_attachment)
+            .set_subpass_count(1)
+            .set_p_subpasses(&subpass_description);
+
+        self.vk_render_pass =
+            match vk_create_render_pass(self.vk_logical_device.unwrap(), render_pass_info) {
+                Ok(render_pass) => Some(render_pass),
+                Err(err) => panic!("Failed to create render pass: {:?}", err),
+            };
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -653,6 +700,11 @@ impl App {
         if let (Some(pipeline_layout), Some(d)) = (self.vk_pipeline_layout.take(), device) {
             vk_destroy_pipeline_layout(d, pipeline_layout);
             println!("Pipeline layout destroyed");
+            device = Some(d);
+        }
+        if let (Some(render_pass), Some(d)) = (self.vk_render_pass.take(), device) {
+            vk_destroy_render_pass(d, render_pass);
+            println!("Render pass destroyed");
             device = Some(d);
         }
         if let Some(d) = device {

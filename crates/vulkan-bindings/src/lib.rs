@@ -75,6 +75,12 @@ pub fn vk_destroy_pipeline_layout(device: VkDevice, pipeline_layout: VkPipelineL
     }
 }
 
+pub fn vk_destroy_render_pass(device: VkDevice, render_pass: VkRenderPass) {
+    unsafe {
+        vkDestroyRenderPass(device, render_pass, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -390,6 +396,21 @@ pub fn vk_create_image_view(
     }
 }
 
+pub fn vk_create_render_pass(
+    device: VkDevice,
+    render_pass_create_info: VkRenderPassCreateInfo,
+) -> Result<VkRenderPass, VulkanError> {
+    unsafe {
+        let mut render_pass: VkRenderPass = std::mem::zeroed();
+        let result = vkCreateRenderPass(device, &render_pass_create_info, null(), &mut render_pass);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateRenderPass)
+        } else {
+            Ok(render_pass)
+        }
+    }
+}
+
 pub fn vk_create_pipeline_layout(
     device: VkDevice,
     pipeline_layout_create_info: VkPipelineLayoutCreateInfo,
@@ -448,4 +469,5 @@ pub enum VulkanError {
     CouldNotCreateImageView,
     CouldNotCreateShaderModule,
     CouldNotCreatePipelineLayout,
+    CouldNotCreateRenderPass,
 }
