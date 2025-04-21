@@ -87,6 +87,12 @@ pub fn vk_destroy_graphics_pipeline(device: VkDevice, graphics_pipeline: VkPipel
     }
 }
 
+pub fn vk_destroy_framebuffer(device: VkDevice, framebuffer: VkFramebuffer) {
+    unsafe {
+        vkDestroyFramebuffer(device, framebuffer, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -457,6 +463,22 @@ pub fn vk_create_shader_module(
     }
 }
 
+pub fn vk_create_framebuffer(
+    device: VkDevice,
+    framebuffer_create_info: VkFramebufferCreateInfo,
+) -> Result<VkFramebuffer, VulkanError> {
+    unsafe {
+        let mut framebuffer: VkFramebuffer = std::mem::zeroed();
+        let result =
+            vkCreateFramebuffer(device, &framebuffer_create_info, null(), &mut framebuffer);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateFramebuffer)
+        } else {
+            Ok(framebuffer)
+        }
+    }
+}
+
 pub fn vk_create_graphics_pipeline(
     device: VkDevice,
     graphics_pipeline_create_info: VkGraphicsPipelineCreateInfo,
@@ -499,4 +521,5 @@ pub enum VulkanError {
     CouldNotCreatePipelineLayout,
     CouldNotCreateRenderPass,
     CouldNotCreateGraphicsPipeline,
+    CouldNotCreateFramebuffer,
 }

@@ -31,8 +31,9 @@ use vulkan_bindings::{
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
     VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
-    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFrontFace_VK_FRONT_FACE_CLOCKWISE,
-    VkGraphicsPipelineCreateInfo, VkImage, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
+    VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFramebuffer, VkFramebufferCreateInfo,
+    VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkGraphicsPipelineCreateInfo, VkImage,
+    VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
     VkImageLayout_VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
@@ -53,9 +54,9 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
     vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
-    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device,
+    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_framebuffer,
     vk_destroy_graphics_pipeline, vk_destroy_image_view, vk_destroy_instance,
     vk_destroy_pipeline_layout, vk_destroy_render_pass, vk_destroy_shader_module,
     vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
@@ -90,6 +91,7 @@ pub struct App {
     vk_render_pass: Option<VkRenderPass>,
     vk_pipeline_layout: Option<VkPipelineLayout>,
     vk_graphics_pipeline: Option<VkPipeline>,
+    vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
 }
 
 impl App {
@@ -118,6 +120,8 @@ impl App {
         println!("Render pass created");
         self.vk_create_graphics_pipeline();
         println!("Graphics pipeline created");
+        self.vk_create_framebuffers();
+        println!("Framebuffers created");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -721,6 +725,27 @@ impl App {
             };
     }
 
+    fn vk_create_framebuffers(self: &mut Self) {
+        self.vk_swap_chain_framebuffers = Vec::with_capacity(self.vk_swap_chain_image_views.len());
+        for (i, image_view) in self.vk_swap_chain_image_views.iter().enumerate() {
+            let attachments = *image_view;
+
+            let mut framebuffer_info = VkFramebufferCreateInfo::default();
+            framebuffer_info
+                .set_render_pass(self.vk_render_pass.unwrap())
+                .set_attachment_count(1)
+                .set_p_attachments(&attachments)
+                .set_width(self.vk_swap_chain_image_extent.unwrap().width)
+                .set_height(self.vk_swap_chain_image_extent.unwrap().height)
+                .set_layers(1);
+
+            match vk_create_framebuffer(self.vk_logical_device.unwrap(), framebuffer_info) {
+                Ok(framebuffer) => self.vk_swap_chain_framebuffers.push(framebuffer),
+                Err(err) => panic!("Failed to create framebuffer: {:?}", err),
+            }
+        }
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -750,6 +775,16 @@ impl App {
 
     fn cleanup(&mut self) {
         let mut device = self.vk_logical_device.take();
+
+        if let Some(d) = device {
+            for (i, framebuffer) in self.vk_swap_chain_framebuffers.iter().enumerate() {
+                if !framebuffer.is_null() {
+                    vk_destroy_framebuffer(d, *framebuffer);
+                    println!("Framebuffer {} destroyed", i);
+                }
+            }
+            device = Some(d);
+        }
 
         if let (Some(pipeline), Some(d)) = (self.vk_graphics_pipeline.take(), device) {
             vk_destroy_graphics_pipeline(d, pipeline);
