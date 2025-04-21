@@ -727,7 +727,7 @@ impl App {
 
     fn vk_create_framebuffers(self: &mut Self) {
         self.vk_swap_chain_framebuffers = Vec::with_capacity(self.vk_swap_chain_image_views.len());
-        for (i, image_view) in self.vk_swap_chain_image_views.iter().enumerate() {
+        for image_view in self.vk_swap_chain_image_views.iter() {
             let attachments = *image_view;
 
             let mut framebuffer_info = VkFramebufferCreateInfo::default();
@@ -774,48 +774,39 @@ impl App {
     }
 
     fn cleanup(&mut self) {
-        let mut device = self.vk_logical_device.take();
-
-        if let Some(d) = device {
+        if let Some(device) = self.vk_logical_device.take() {
             for (i, framebuffer) in self.vk_swap_chain_framebuffers.iter().enumerate() {
                 if !framebuffer.is_null() {
-                    vk_destroy_framebuffer(d, *framebuffer);
+                    vk_destroy_framebuffer(device, *framebuffer);
                     println!("Framebuffer {} destroyed", i);
                 }
             }
-            device = Some(d);
-        }
-
-        if let (Some(pipeline), Some(d)) = (self.vk_graphics_pipeline.take(), device) {
-            vk_destroy_graphics_pipeline(d, pipeline);
-            println!("Graphics pipeline destroyed");
-            device = Some(d);
-        }
-
-        if let (Some(pipeline_layout), Some(d)) = (self.vk_pipeline_layout.take(), device) {
-            vk_destroy_pipeline_layout(d, pipeline_layout);
-            println!("Pipeline layout destroyed");
-            device = Some(d);
-        }
-        if let (Some(render_pass), Some(d)) = (self.vk_render_pass.take(), device) {
-            vk_destroy_render_pass(d, render_pass);
-            println!("Render pass destroyed");
-            device = Some(d);
-        }
-        if let Some(d) = device {
+            if let Some(pipeline) = self.vk_graphics_pipeline.take() {
+                vk_destroy_graphics_pipeline(device, pipeline);
+                println!("Graphics pipeline destroyed");
+            }
+            if let Some(pipeline_layout) = self.vk_pipeline_layout.take() {
+                vk_destroy_pipeline_layout(device, pipeline_layout);
+                println!("Pipeline layout destroyed");
+            }
+            if let Some(render_pass) = self.vk_render_pass.take() {
+                vk_destroy_render_pass(device, render_pass);
+                println!("Render pass destroyed");
+            }
             for (i, &image_view) in self.vk_swap_chain_image_views.iter().enumerate() {
                 if !image_view.is_null() {
-                    vk_destroy_image_view(d, image_view);
+                    vk_destroy_image_view(device, image_view);
                     println!("Image view destroyed: {}", i);
                 }
             }
             if let Some(swapchain) = self.vk_swap_chain.take() {
-                vk_destroy_swapchain_khr(d, swapchain);
+                vk_destroy_swapchain_khr(device, swapchain);
                 println!("Swapchain destroyed");
             }
-            vk_destroy_device(d);
+            vk_destroy_device(device);
             println!("Device destroyed");
         }
+
         if let (Some(instance), Some(surface)) =
             (self.vk_instance.take(), self.vk_surface_khr.take())
         {
