@@ -93,6 +93,12 @@ pub fn vk_destroy_framebuffer(device: VkDevice, framebuffer: VkFramebuffer) {
     }
 }
 
+pub fn vk_destroy_command_pool(device: VkDevice, command_pool: VkCommandPool) {
+    unsafe {
+        vkDestroyCommandPool(device, command_pool, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -479,6 +485,22 @@ pub fn vk_create_framebuffer(
     }
 }
 
+pub fn vk_create_command_pool(
+    device: VkDevice,
+    command_pool_create_info: VkCommandPoolCreateInfo,
+) -> Result<VkCommandPool, VulkanError> {
+    unsafe {
+        let mut command_pool: VkCommandPool = std::mem::zeroed();
+        let result =
+            vkCreateCommandPool(device, &command_pool_create_info, null(), &mut command_pool);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateCommandPool)
+        } else {
+            Ok(command_pool)
+        }
+    }
+}
+
 pub fn vk_create_graphics_pipeline(
     device: VkDevice,
     graphics_pipeline_create_info: VkGraphicsPipelineCreateInfo,
@@ -522,4 +544,5 @@ pub enum VulkanError {
     CouldNotCreateRenderPass,
     CouldNotCreateGraphicsPipeline,
     CouldNotCreateFramebuffer,
+    CouldNotCreateCommandPool,
 }

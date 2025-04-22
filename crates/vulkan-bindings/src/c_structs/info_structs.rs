@@ -1,4 +1,5 @@
 mod vk_application_info;
+mod vk_command_pool_create_info;
 mod vk_device_create_info;
 mod vk_device_queue_create_info;
 mod vk_framebuffer_create_info;

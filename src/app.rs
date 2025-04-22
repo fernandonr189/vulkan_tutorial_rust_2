@@ -25,7 +25,9 @@ use vulkan_bindings::{
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_G_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_R_BIT,
-    VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, VkCommandPool,
+    VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    VkCommandPoolCreateFlags, VkCommandPoolCreateInfo,
     VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
@@ -54,9 +56,10 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
-    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
-    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_device, vk_destroy_framebuffer,
+    vk_create_command_pool, vk_create_framebuffer, vk_create_graphics_pipeline,
+    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
+    vk_create_render_pass, vk_create_shader_module, vk_create_swapchain_khr,
+    vk_destroy_command_pool, vk_destroy_device, vk_destroy_framebuffer,
     vk_destroy_graphics_pipeline, vk_destroy_image_view, vk_destroy_instance,
     vk_destroy_pipeline_layout, vk_destroy_render_pass, vk_destroy_shader_module,
     vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
@@ -92,6 +95,7 @@ pub struct App {
     vk_pipeline_layout: Option<VkPipelineLayout>,
     vk_graphics_pipeline: Option<VkPipeline>,
     vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
+    vk_command_pool: Option<VkCommandPool>,
 }
 
 impl App {
@@ -122,6 +126,8 @@ impl App {
         println!("Graphics pipeline created");
         self.vk_create_framebuffers();
         println!("Framebuffers created");
+        self.vk_create_command_pool();
+        println!("Command pool created");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -746,6 +752,21 @@ impl App {
         }
     }
 
+    fn vk_create_command_pool(self: &mut Self) {
+        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+
+        let mut command_pool_info = VkCommandPoolCreateInfo::default();
+        command_pool_info
+            .set_flags(VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
+            .set_queue_family_index(queue_family_indices.graphics_family.unwrap());
+
+        self.vk_command_pool =
+            match vk_create_command_pool(self.vk_logical_device.unwrap(), command_pool_info) {
+                Ok(command_pool) => Some(command_pool),
+                Err(err) => panic!("Failed to create command pool: {:?}", err),
+            };
+    }
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -775,6 +796,11 @@ impl App {
 
     fn cleanup(&mut self) {
         if let Some(device) = self.vk_logical_device.take() {
+            if let Some(command_pool) = self.vk_command_pool.take() {
+                vk_destroy_command_pool(device, command_pool);
+                println!("Command pool destroyed");
+            }
+
             for (i, framebuffer) in self.vk_swap_chain_framebuffers.iter().enumerate() {
                 if !framebuffer.is_null() {
                     vk_destroy_framebuffer(device, *framebuffer);
