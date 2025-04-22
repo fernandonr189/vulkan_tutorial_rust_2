@@ -501,6 +501,24 @@ pub fn vk_create_command_pool(
     }
 }
 
+pub fn vk_allocate_command_buffers(
+    device: VkDevice,
+    command_buffer_allocate_info: VkCommandBufferAllocateInfo,
+) -> Result<VkCommandBuffer, VulkanError> {
+    unsafe {
+        let mut command_buffer: VkCommandBuffer = std::mem::zeroed();
+
+        let result =
+            vkAllocateCommandBuffers(device, &command_buffer_allocate_info, &mut command_buffer);
+
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotAllocateCommandBuffers)
+        } else {
+            Ok(command_buffer)
+        }
+    }
+}
+
 pub fn vk_create_graphics_pipeline(
     device: VkDevice,
     graphics_pipeline_create_info: VkGraphicsPipelineCreateInfo,
@@ -545,4 +563,5 @@ pub enum VulkanError {
     CouldNotCreateGraphicsPipeline,
     CouldNotCreateFramebuffer,
     CouldNotCreateCommandPool,
+    CouldNotAllocateCommandBuffers,
 }

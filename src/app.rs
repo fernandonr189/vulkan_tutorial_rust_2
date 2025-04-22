@@ -25,7 +25,9 @@ use vulkan_bindings::{
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_G_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_R_BIT,
-    VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, VkCommandPool,
+    VkColorSpaceKHR_VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, VkCommandBuffer,
+    VkCommandBufferAllocateInfo, VkCommandBufferBeginInfo,
+    VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY, VkCommandPool,
     VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     VkCommandPoolCreateFlags, VkCommandPoolCreateInfo,
     VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -56,16 +58,16 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
     VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_create_command_pool, vk_create_framebuffer, vk_create_graphics_pipeline,
-    vk_create_image_view, vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout,
-    vk_create_render_pass, vk_create_shader_module, vk_create_swapchain_khr,
-    vk_destroy_command_pool, vk_destroy_device, vk_destroy_framebuffer,
-    vk_destroy_graphics_pipeline, vk_destroy_image_view, vk_destroy_instance,
-    vk_destroy_pipeline_layout, vk_destroy_render_pass, vk_destroy_shader_module,
-    vk_destroy_surface_khr, vk_destroy_swapchain_khr, vk_get_available_devices,
-    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
-    vk_get_physical_device_features, vk_get_physical_device_properties,
-    vk_get_physical_device_queue_family_properties,
+    vk_allocate_command_buffers, vk_create_command_pool, vk_create_framebuffer,
+    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool, vk_destroy_device,
+    vk_destroy_framebuffer, vk_destroy_graphics_pipeline, vk_destroy_image_view,
+    vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
+    vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
+    vk_get_available_devices, vk_get_available_layer_properties,
+    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
+    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -96,6 +98,7 @@ pub struct App {
     vk_graphics_pipeline: Option<VkPipeline>,
     vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
     vk_command_pool: Option<VkCommandPool>,
+    vk_command_buffer: Option<VkCommandBuffer>,
 }
 
 impl App {
@@ -128,6 +131,8 @@ impl App {
         println!("Framebuffers created");
         self.vk_create_command_pool();
         println!("Command pool created");
+        self.vk_create_command_buffers();
+        println!("Command buffers created");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -765,6 +770,29 @@ impl App {
                 Ok(command_pool) => Some(command_pool),
                 Err(err) => panic!("Failed to create command pool: {:?}", err),
             };
+    }
+
+    fn vk_create_command_buffers(self: &mut Self) {
+        let mut alloc_info = VkCommandBufferAllocateInfo::default();
+        alloc_info
+            .set_command_pool(self.vk_command_pool.unwrap())
+            .set_level(VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+            .set_command_buffer_count(1);
+
+        self.vk_command_buffer =
+            match vk_allocate_command_buffers(self.vk_logical_device.unwrap(), alloc_info) {
+                Ok(command_buffer) => Some(command_buffer),
+                Err(err) => panic!("Failed to allocate command buffers: {:?}", err),
+            };
+    }
+
+    fn vk_record_command_buffer(
+        self: &mut Self,
+        command_buffer: VkCommandBuffer,
+        image_index: u32,
+    ) {
+        let mut begin_info = VkCommandBufferBeginInfo::default();
+        begin_info.set_flags(0);
     }
 
     // GLFW FUNCTIONS
