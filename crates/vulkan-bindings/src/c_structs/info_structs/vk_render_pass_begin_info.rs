@@ -9,6 +9,6 @@ create_info_builder!(
     set_render_pass => renderPass: VkRenderPass,
     set_framebuffer => framebuffer: VkFramebuffer,
     set_render_area => renderArea: VkRect2D,
-    set_clear_values => pClearValues: *const VkClearValue,
+    set_p_clear_values => pClearValues: &VkClearValue => null,
     set_clear_value_count => clearValueCount: u32,
 );

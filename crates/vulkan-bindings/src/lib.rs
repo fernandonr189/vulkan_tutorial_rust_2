@@ -519,6 +519,21 @@ pub fn vk_allocate_command_buffers(
     }
 }
 
+pub fn vk_begin_command_buffer(
+    command_buffer: VkCommandBuffer,
+    command_buffer_begin_info: VkCommandBufferBeginInfo,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotAllocateCommandBuffers)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 pub fn vk_create_graphics_pipeline(
     device: VkDevice,
     graphics_pipeline_create_info: VkGraphicsPipelineCreateInfo,
@@ -538,6 +553,16 @@ pub fn vk_create_graphics_pipeline(
         } else {
             Ok(pipeline)
         }
+    }
+}
+
+pub fn vk_cmd_begin_render_pass(
+    command_buffer: VkCommandBuffer,
+    render_pass_begin_info: VkRenderPassBeginInfo,
+    subpass_contents: VkSubpassContents,
+) {
+    unsafe {
+        vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, subpass_contents);
     }
 }
 

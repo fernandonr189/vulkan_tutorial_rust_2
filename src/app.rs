@@ -20,7 +20,7 @@ use vulkan_bindings::{
     VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_DONT_CARE, VkAttachmentReference,
     VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_DONT_CARE,
     VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_STORE, VkBlendFactor_VK_BLEND_FACTOR_ONE,
-    VkBlendFactor_VK_BLEND_FACTOR_ZERO, VkBlendOp_VK_BLEND_OP_ADD,
+    VkBlendFactor_VK_BLEND_FACTOR_ZERO, VkBlendOp_VK_BLEND_OP_ADD, VkClearColorValue, VkClearValue,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_A_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_B_BIT,
     VkColorComponentFlagBits_VK_COLOR_COMPONENT_G_BIT,
@@ -52,13 +52,14 @@ use vulkan_bindings::{
     VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
-    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRenderPass, VkRenderPassCreateInfo,
-    VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkShaderModule, VkShaderModuleCreateInfo,
-    VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRenderPass, VkRenderPassBeginInfo,
+    VkRenderPassCreateInfo, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkShaderModule,
+    VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
-    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassDescription, VkSurfaceCapabilitiesKHR,
-    VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR, VkSwapchainKHR,
-    vk_allocate_command_buffers, vk_create_command_pool, vk_create_framebuffer,
+    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
+    VkSubpassDescription, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR,
+    VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_allocate_command_buffers, vk_begin_command_buffer,
+    vk_cmd_begin_render_pass, vk_create_command_pool, vk_create_framebuffer,
     vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
     vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
     vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool, vk_destroy_device,
@@ -793,6 +794,33 @@ impl App {
     ) {
         let mut begin_info = VkCommandBufferBeginInfo::default();
         begin_info.set_flags(0);
+
+        match vk_begin_command_buffer(command_buffer, begin_info) {
+            Ok(_) => (),
+            Err(err) => panic!("Failed to begin recording command buffer: {:?}", err),
+        }
+
+        let clear_color = VkClearValue {
+            color: VkClearColorValue {
+                float32: [0.0, 0.0, 0.0, 1.0],
+            },
+        };
+        let mut render_pass_begin_info = VkRenderPassBeginInfo::default();
+        render_pass_begin_info
+            .set_render_pass(self.vk_render_pass.unwrap())
+            .set_framebuffer(self.vk_swap_chain_framebuffers[image_index as usize])
+            .set_render_area(vulkan_bindings::VkRect2D {
+                offset: vulkan_bindings::VkOffset2D { x: 0, y: 0 },
+                extent: self.vk_swap_chain_image_extent.unwrap(),
+            })
+            .set_p_clear_values(&clear_color)
+            .set_clear_value_count(1);
+
+        vk_cmd_begin_render_pass(
+            command_buffer,
+            render_pass_begin_info,
+            VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
+        );
     }
 
     // GLFW FUNCTIONS
