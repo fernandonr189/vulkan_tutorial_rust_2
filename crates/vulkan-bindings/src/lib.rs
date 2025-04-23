@@ -597,7 +597,7 @@ pub fn vk_cmd_end_render_pass(command_buffer: VkCommandBuffer) {
 pub fn vk_end_command_buffer(command_buffer: VkCommandBuffer) -> Result<(), VulkanError> {
     unsafe {
         let result = vkEndCommandBuffer(command_buffer);
-        if result != VK_SUCCESS {
+        if result != VkResult_VK_SUCCESS {
             Err(VulkanError::FailedToEndCommandBuffer)
         } else {
             Ok(())

@@ -67,7 +67,7 @@ use vulkan_bindings::{
     vk_destroy_framebuffer, vk_destroy_graphics_pipeline, vk_destroy_image_view,
     vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
     vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
-    vk_get_available_devices, vk_get_available_layer_properties,
+    vk_end_command_buffer, vk_get_available_devices, vk_get_available_layer_properties,
     vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
     vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
