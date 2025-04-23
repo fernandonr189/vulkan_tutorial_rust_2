@@ -99,6 +99,18 @@ pub fn vk_destroy_command_pool(device: VkDevice, command_pool: VkCommandPool) {
     }
 }
 
+pub fn vk_destroy_semaphore(device: VkDevice, semaphore: VkSemaphore) {
+    unsafe {
+        vkDestroySemaphore(device, semaphore, null());
+    }
+}
+
+pub fn vk_destroy_fence(device: VkDevice, fence: VkFence) {
+    unsafe {
+        vkDestroyFence(device, fence, null());
+    }
+}
+
 pub fn vk_get_supported_extensions() -> Result<(u32, Vec<VkExtensionProperties>), VulkanError> {
     let mut extension_count: u32 = 0;
     unsafe {
@@ -556,6 +568,36 @@ pub fn vk_create_graphics_pipeline(
     }
 }
 
+pub fn vk_create_fence(
+    device: VkDevice,
+    create_info: VkFenceCreateInfo,
+) -> Result<VkFence, VulkanError> {
+    unsafe {
+        let mut fence: VkFence = std::mem::zeroed();
+        let result = vkCreateFence(device, &create_info, null(), &mut fence);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateFence)
+        } else {
+            Ok(fence)
+        }
+    }
+}
+
+pub fn vk_create_semaphore(
+    device: VkDevice,
+    create_info: VkSemaphoreCreateInfo,
+) -> Result<VkSemaphore, VulkanError> {
+    unsafe {
+        let mut semaphore: VkSemaphore = std::mem::zeroed();
+        let result = vkCreateSemaphore(device, &create_info, null(), &mut semaphore);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::CouldNotCreateSemaphore)
+        } else {
+            Ok(semaphore)
+        }
+    }
+}
+
 pub fn vk_cmd_begin_render_pass(
     command_buffer: VkCommandBuffer,
     render_pass_begin_info: VkRenderPassBeginInfo,
@@ -647,4 +689,6 @@ pub enum VulkanError {
     CouldNotCreateCommandPool,
     CouldNotAllocateCommandBuffers,
     FailedToEndCommandBuffer,
+    CouldNotCreateSemaphore,
+    CouldNotCreateFence,
 }

@@ -34,7 +34,7 @@ use vulkan_bindings::{
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
-    VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFormat,
+    VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFence, VkFenceCreateInfo, VkFormat,
     VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFramebuffer, VkFramebufferCreateInfo,
     VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkGraphicsPipelineCreateInfo, VkImage,
     VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
@@ -53,23 +53,25 @@ use vulkan_bindings::{
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRect2D, VkRenderPass, VkRenderPassBeginInfo,
-    VkRenderPassCreateInfo, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkShaderModule,
-    VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
+    VkRenderPassCreateInfo, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkSemaphore,
+    VkSemaphoreCreateInfo, VkShaderModule, VkShaderModuleCreateInfo,
+    VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
     VkSubpassDescription, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR,
     VkSwapchainCreateInfoKHR, VkSwapchainKHR, VkViewport, vk_allocate_command_buffers,
     vk_begin_command_buffer, vk_cmd_begin_render_pass, vk_cmd_bind_pipeline, vk_cmd_draw,
     vk_cmd_end_render_pass, vk_cmd_set_scissor, vk_cmd_set_viewport, vk_create_command_pool,
-    vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
-    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
-    vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool, vk_destroy_device,
-    vk_destroy_framebuffer, vk_destroy_graphics_pipeline, vk_destroy_image_view,
-    vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
-    vk_destroy_shader_module, vk_destroy_surface_khr, vk_destroy_swapchain_khr,
-    vk_end_command_buffer, vk_get_available_devices, vk_get_available_layer_properties,
-    vk_get_device_extensions_properties, vk_get_device_queue, vk_get_physical_device_features,
-    vk_get_physical_device_properties, vk_get_physical_device_queue_family_properties,
+    vk_create_fence, vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view,
+    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    vk_create_semaphore, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool,
+    vk_destroy_device, vk_destroy_fence, vk_destroy_framebuffer, vk_destroy_graphics_pipeline,
+    vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
+    vk_destroy_semaphore, vk_destroy_shader_module, vk_destroy_surface_khr,
+    vk_destroy_swapchain_khr, vk_end_command_buffer, vk_get_available_devices,
+    vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
+    vk_get_physical_device_features, vk_get_physical_device_properties,
+    vk_get_physical_device_queue_family_properties,
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
@@ -101,6 +103,9 @@ pub struct App {
     vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
     vk_command_pool: Option<VkCommandPool>,
     vk_command_buffer: Option<VkCommandBuffer>,
+    vk_image_available_semaphore: Option<VkSemaphore>,
+    vk_render_finished_semaphore: Option<VkSemaphore>,
+    vk_in_flight_fence: Option<VkFence>,
 }
 
 impl App {
@@ -135,6 +140,8 @@ impl App {
         println!("Command pool created");
         self.vk_create_command_buffers();
         println!("Command buffers created");
+        self.vk_create_sync_objects();
+        println!("Sync objects created");
     }
 
     fn vk_create_instance(self: &mut Self) {
@@ -854,6 +861,30 @@ impl App {
         }
     }
 
+    fn vk_create_sync_objects(self: &mut Self) {
+        let semaphore_info = VkSemaphoreCreateInfo::default();
+
+        self.vk_image_available_semaphore =
+            match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
+                Ok(semaphore) => Some(semaphore),
+                Err(err) => panic!("Failed to create image available semaphore: {:?}", err),
+            };
+
+        self.vk_render_finished_semaphore =
+            match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
+                Ok(semaphore) => Some(semaphore),
+                Err(err) => panic!("Failed to create render finished semaphore: {:?}", err),
+            };
+
+        let fence_info = VkFenceCreateInfo::default();
+        self.vk_in_flight_fence = match vk_create_fence(self.vk_logical_device.unwrap(), fence_info)
+        {
+            Ok(fence) => Some(fence),
+            Err(err) => panic!("Failed to create in-flight fence: {:?}", err),
+        };
+    }
+    fn draw_frame(self: &mut Self) {}
+
     // GLFW FUNCTIONS
 
     fn glfw_create_surface(self: &mut Self) {
@@ -877,12 +908,27 @@ impl App {
     fn main_loop(self: &mut Self) {
         while !glfw_window_should_close(self.window.unwrap()) {
             glfw_poll_events();
-            sleep(Duration::from_millis(16));
+            self.draw_frame();
         }
     }
 
     fn cleanup(&mut self) {
         if let Some(device) = self.vk_logical_device.take() {
+            if let Some(fence) = self.vk_in_flight_fence.take() {
+                vk_destroy_fence(device, fence);
+                println!("In-flight fence destroyed");
+            }
+
+            if let Some(semaphore) = self.vk_image_available_semaphore.take() {
+                vk_destroy_semaphore(device, semaphore);
+                println!("Image available semaphore destroyed");
+            }
+
+            if let Some(semaphore) = self.vk_render_finished_semaphore.take() {
+                vk_destroy_semaphore(device, semaphore);
+                println!("Render finished semaphore destroyed");
+            }
+
             if let Some(command_pool) = self.vk_command_pool.take() {
                 vk_destroy_command_pool(device, command_pool);
                 println!("Command pool destroyed");
