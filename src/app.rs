@@ -7,8 +7,8 @@ use std::{
 
 use ffi_utils::StringFfi;
 use glfw_bindings::{
-    self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFW_TRUE, GLFWwindow,
-    glfw_create_window, glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
+    self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
+    glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
     glfw_get_required_instance_extensions, glfw_init, glfw_poll_events, glfw_terminate,
     glfw_window_hint, glfw_window_should_close,
 };
@@ -992,7 +992,7 @@ impl App {
     fn init_window(self: &mut Self) {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfw_window_hint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfw_window_hint(GLFW_RESIZABLE, GLFW_FALSE);
         self.window = match glfw_create_window(800, 600, "Vulkan") {
             Ok(window) => Some(window),
             Err(err) => panic!("Failed to create window: {:?}", err),
