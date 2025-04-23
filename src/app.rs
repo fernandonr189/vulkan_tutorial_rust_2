@@ -42,7 +42,7 @@ use vulkan_bindings::{
     VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED,
     VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VkImageView, VkImageViewCreateInfo,
     VkImageViewType_VK_IMAGE_VIEW_TYPE_2D, VkInstance, VkInstanceCreateInfo,
-    VkLogicOp_VK_LOGIC_OP_COPY, VkPhysicalDevice,
+    VkLogicOp_VK_LOGIC_OP_COPY, VkOffset2D, VkPhysicalDevice,
     VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VkPipeline,
     VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS, VkPipelineColorBlendAttachmentState,
     VkPipelineColorBlendStateCreateInfo, VkPipelineDynamicStateCreateInfo,
@@ -52,15 +52,16 @@ use vulkan_bindings::{
     VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
-    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRenderPass, VkRenderPassBeginInfo,
+    VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRect2D, VkRenderPass, VkRenderPassBeginInfo,
     VkRenderPassCreateInfo, VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT, VkShaderModule,
     VkShaderModuleCreateInfo, VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
     VkSubpassDescription, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR,
-    VkSwapchainCreateInfoKHR, VkSwapchainKHR, vk_allocate_command_buffers, vk_begin_command_buffer,
-    vk_cmd_begin_render_pass, vk_create_command_pool, vk_create_framebuffer,
-    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    VkSwapchainCreateInfoKHR, VkSwapchainKHR, VkViewport, vk_allocate_command_buffers,
+    vk_begin_command_buffer, vk_cmd_begin_render_pass, vk_cmd_bind_pipeline, vk_cmd_draw,
+    vk_cmd_end_render_pass, vk_cmd_set_scissor, vk_cmd_set_viewport, vk_create_command_pool,
+    vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
     vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
     vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool, vk_destroy_device,
     vk_destroy_framebuffer, vk_destroy_graphics_pipeline, vk_destroy_image_view,
@@ -231,9 +232,7 @@ impl App {
 
         let swapchain_support_details = self.vk_query_swapchain_support(device);
 
-        return device_properties.deviceType
-            == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-            && device_features.geometryShader == 1
+        return device_features.geometryShader == 1
             && queue_family_indices.is_complete()
             && extensions_supported
             && swapchain_support_details.is_swapchain_adequate();
@@ -821,6 +820,38 @@ impl App {
             render_pass_begin_info,
             VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
         );
+
+        vk_cmd_bind_pipeline(
+            command_buffer,
+            self.vk_graphics_pipeline.unwrap(),
+            VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS,
+        );
+
+        let mut viewport = VkViewport::default();
+        viewport
+            .set_x(0.0)
+            .set_y(0.0)
+            .set_width(self.vk_swap_chain_image_extent.unwrap().width as f32)
+            .set_height(self.vk_swap_chain_image_extent.unwrap().height as f32)
+            .set_min_depth(0.0)
+            .set_max_depth(1.0);
+
+        vk_cmd_set_viewport(command_buffer, viewport);
+
+        let mut scissor = VkRect2D::default();
+        scissor
+            .set_offset(VkOffset2D { x: 0, y: 0 })
+            .set_extent(self.vk_swap_chain_image_extent.unwrap());
+
+        vk_cmd_set_scissor(command_buffer, scissor);
+
+        vk_cmd_draw(command_buffer, 3, 1, 0, 0);
+        vk_cmd_end_render_pass(command_buffer);
+
+        match vk_end_command_buffer(command_buffer) {
+            Ok(_) => (),
+            Err(err) => panic!("Failed to end command buffer: {:?}", err),
+        }
     }
 
     // GLFW FUNCTIONS

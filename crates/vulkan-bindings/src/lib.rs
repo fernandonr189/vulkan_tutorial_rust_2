@@ -566,6 +566,63 @@ pub fn vk_cmd_begin_render_pass(
     }
 }
 
+pub fn vk_cmd_bind_pipeline(
+    command_buffer: VkCommandBuffer,
+    pipeline: VkPipeline,
+    pipeline_bind_point: VkPipelineBindPoint,
+) {
+    unsafe {
+        vkCmdBindPipeline(command_buffer, pipeline_bind_point, pipeline);
+    }
+}
+
+pub fn vk_cmd_set_viewport(command_buffer: VkCommandBuffer, viewport: VkViewport) {
+    unsafe {
+        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    }
+}
+
+pub fn vk_cmd_set_scissor(command_buffer: VkCommandBuffer, scissor: VkRect2D) {
+    unsafe {
+        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+    }
+}
+
+pub fn vk_cmd_end_render_pass(command_buffer: VkCommandBuffer) {
+    unsafe {
+        vkCmdEndRenderPass(command_buffer);
+    }
+}
+
+pub fn vk_end_command_buffer(command_buffer: VkCommandBuffer) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkEndCommandBuffer(command_buffer);
+        if result != VK_SUCCESS {
+            Err(VulkanError::FailedToEndCommandBuffer)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn vk_cmd_draw(
+    command_buffer: VkCommandBuffer,
+    vertex_count: u32,
+    instance_count: u32,
+    first_vertex: u32,
+    first_instance: u32,
+) {
+    unsafe {
+        vkCmdDraw(
+            command_buffer,
+            vertex_count,
+            instance_count,
+            first_vertex,
+            first_instance,
+        );
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -589,4 +646,5 @@ pub enum VulkanError {
     CouldNotCreateFramebuffer,
     CouldNotCreateCommandPool,
     CouldNotAllocateCommandBuffers,
+    FailedToEndCommandBuffer,
 }
