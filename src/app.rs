@@ -7,8 +7,8 @@ use std::{
 
 use ffi_utils::StringFfi;
 use glfw_bindings::{
-    self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
-    glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
+    self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFW_TRUE, GLFWwindow,
+    glfw_create_window, glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
     glfw_get_required_instance_extensions, glfw_init, glfw_poll_events, glfw_terminate,
     glfw_window_hint, glfw_window_should_close,
 };
@@ -70,7 +70,7 @@ use vulkan_bindings::{
     vk_destroy_device, vk_destroy_fence, vk_destroy_framebuffer, vk_destroy_graphics_pipeline,
     vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
     vk_destroy_semaphore, vk_destroy_shader_module, vk_destroy_surface_khr,
-    vk_destroy_swapchain_khr, vk_end_command_buffer, vk_get_available_devices,
+    vk_destroy_swapchain_khr, vk_device_wait_idle, vk_end_command_buffer, vk_get_available_devices,
     vk_get_available_layer_properties, vk_get_device_extensions_properties, vk_get_device_queue,
     vk_get_physical_device_features, vk_get_physical_device_properties,
     vk_get_physical_device_queue_family_properties,
@@ -992,7 +992,7 @@ impl App {
     fn init_window(self: &mut Self) {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfw_window_hint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfw_window_hint(GLFW_RESIZABLE, GLFW_TRUE);
         self.window = match glfw_create_window(800, 600, "Vulkan") {
             Ok(window) => Some(window),
             Err(err) => panic!("Failed to create window: {:?}", err),
@@ -1003,6 +1003,11 @@ impl App {
         while !glfw_window_should_close(self.window.unwrap()) {
             glfw_poll_events();
             self.draw_frame();
+        }
+
+        match vk_device_wait_idle(self.vk_logical_device.unwrap()) {
+            Ok(_) => println!("Device idle"),
+            Err(err) => panic!("Failed to wait for device idle: {:?}", err),
         }
     }
 

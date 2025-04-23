@@ -748,6 +748,17 @@ pub fn vk_queue_present_khr(
     }
 }
 
+pub fn vk_device_wait_idle(device: VkDevice) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkDeviceWaitIdle(device);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToWaitDeviceIdle)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 pub fn vk_queue_submit(
     queue: VkQueue,
     submit_count: u32,
@@ -796,4 +807,5 @@ pub enum VulkanError {
     FailedToResetCommandBuffer,
     FailedToSubmitCommandBuffer,
     FailedToPresentImage,
+    FailedToWaitDeviceIdle,
 }
