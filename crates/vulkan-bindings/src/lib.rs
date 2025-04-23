@@ -665,6 +665,61 @@ pub fn vk_cmd_draw(
     }
 }
 
+pub fn vk_reset_fences(
+    device: VkDevice,
+    fences_count: u32,
+    fence: &VkFence,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkResetFences(device, fences_count, fence);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToResetFences)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn vk_wait_for_fences(
+    device: VkDevice,
+    fences_count: u32,
+    fence: &VkFence,
+    timeout: u64,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkWaitForFences(device, fences_count, fence, true as u32, timeout);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToWaitForFences)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn vk_acquire_next_image_khr(
+    device: VkDevice,
+    swapchain: VkSwapchainKHR,
+    timeout: u64,
+    image_available_semaphore: VkSemaphore,
+) -> Result<u32, VulkanError> {
+    unsafe {
+        let mut index = 0;
+        let result = vkAcquireNextImageKHR(
+            device,
+            swapchain,
+            timeout,
+            image_available_semaphore,
+            null_mut(),
+            &mut index,
+        );
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToAcquireNextImage)
+        } else {
+            Ok(index)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -691,4 +746,7 @@ pub enum VulkanError {
     FailedToEndCommandBuffer,
     CouldNotCreateSemaphore,
     CouldNotCreateFence,
+    FailedToWaitForFences,
+    FailedToResetFences,
+    FailedToAcquireNextImage,
 }

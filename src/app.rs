@@ -15,7 +15,7 @@ use glfw_bindings::{
     glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkAttachmentDescription,
+    UINT32_MAX, VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkAttachmentDescription,
     VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR,
     VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_DONT_CARE, VkAttachmentReference,
     VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -34,7 +34,8 @@ use vulkan_bindings::{
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
-    VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFence, VkFenceCreateInfo, VkFormat,
+    VkDynamicState_VK_DYNAMIC_STATE_VIEWPORT, VkExtent2D, VkFence,
+    VkFenceCreateFlagBits_VK_FENCE_CREATE_SIGNALED_BIT, VkFenceCreateInfo, VkFormat,
     VkFormat_VK_FORMAT_B8G8R8A8_SRGB, VkFramebuffer, VkFramebufferCreateInfo,
     VkFrontFace_VK_FRONT_FACE_CLOCKWISE, VkGraphicsPipelineCreateInfo, VkImage,
     VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
@@ -59,11 +60,12 @@ use vulkan_bindings::{
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
     VkSubpassDescription, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR,
-    VkSwapchainCreateInfoKHR, VkSwapchainKHR, VkViewport, vk_allocate_command_buffers,
-    vk_begin_command_buffer, vk_cmd_begin_render_pass, vk_cmd_bind_pipeline, vk_cmd_draw,
-    vk_cmd_end_render_pass, vk_cmd_set_scissor, vk_cmd_set_viewport, vk_create_command_pool,
-    vk_create_fence, vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view,
-    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    VkSwapchainCreateInfoKHR, VkSwapchainKHR, VkViewport, vk_acquire_next_image_khr,
+    vk_allocate_command_buffers, vk_begin_command_buffer, vk_cmd_begin_render_pass,
+    vk_cmd_bind_pipeline, vk_cmd_draw, vk_cmd_end_render_pass, vk_cmd_set_scissor,
+    vk_cmd_set_viewport, vk_create_command_pool, vk_create_fence, vk_create_framebuffer,
+    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
     vk_create_semaphore, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool,
     vk_destroy_device, vk_destroy_fence, vk_destroy_framebuffer, vk_destroy_graphics_pipeline,
     vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
@@ -75,6 +77,7 @@ use vulkan_bindings::{
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
+    vk_reset_fences, vk_wait_for_fences,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -876,14 +879,44 @@ impl App {
                 Err(err) => panic!("Failed to create render finished semaphore: {:?}", err),
             };
 
-        let fence_info = VkFenceCreateInfo::default();
+        let mut fence_info = VkFenceCreateInfo::default();
+        fence_info.set_flags(VkFenceCreateFlagBits_VK_FENCE_CREATE_SIGNALED_BIT);
         self.vk_in_flight_fence = match vk_create_fence(self.vk_logical_device.unwrap(), fence_info)
         {
             Ok(fence) => Some(fence),
             Err(err) => panic!("Failed to create in-flight fence: {:?}", err),
         };
     }
-    fn draw_frame(self: &mut Self) {}
+    fn draw_frame(self: &mut Self) {
+        match vk_wait_for_fences(
+            self.vk_logical_device.unwrap(),
+            1,
+            &self.vk_in_flight_fence.unwrap(),
+            UINT32_MAX as u64,
+        ) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to wait for fences: {:?}", err),
+        };
+
+        match vk_reset_fences(
+            self.vk_logical_device.unwrap(),
+            1,
+            &self.vk_in_flight_fence.unwrap(),
+        ) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to reset fences: {:?}", err),
+        };
+
+        let image_index = match vk_acquire_next_image_khr(
+            self.vk_logical_device.unwrap(),
+            self.vk_swap_chain.unwrap(),
+            UINT32_MAX as u64,
+            self.vk_image_available_semaphore.unwrap(),
+        ) {
+            Ok(index) => index,
+            Err(err) => panic!("Failed to acquire next image: {:?}", err),
+        };
+    }
 
     // GLFW FUNCTIONS
 
