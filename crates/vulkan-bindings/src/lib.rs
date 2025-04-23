@@ -720,6 +720,50 @@ pub fn vk_acquire_next_image_khr(
     }
 }
 
+pub fn vk_reset_command_buffer(
+    command_buffer: VkCommandBuffer,
+    flags: u32,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkResetCommandBuffer(command_buffer, flags);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToResetCommandBuffer)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn vk_queue_present_khr(
+    queue: VkQueue,
+    present_info: &VkPresentInfoKHR,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkQueuePresentKHR(queue, present_info);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToPresentImage)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub fn vk_queue_submit(
+    queue: VkQueue,
+    submit_count: u32,
+    submit_info: &VkSubmitInfo,
+    fence: VkFence,
+) -> Result<(), VulkanError> {
+    unsafe {
+        let result = vkQueueSubmit(queue, submit_count, submit_info, fence);
+        if result != VkResult_VK_SUCCESS {
+            Err(VulkanError::FailedToSubmitCommandBuffer)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum VulkanError {
     CouldNotCreateInstance,
@@ -749,4 +793,7 @@ pub enum VulkanError {
     FailedToWaitForFences,
     FailedToResetFences,
     FailedToAcquireNextImage,
+    FailedToResetCommandBuffer,
+    FailedToSubmitCommandBuffer,
+    FailedToPresentImage,
 }

@@ -1,5 +1,3 @@
-use std::ffi::c_void;
-
 use crate::{
     VkFenceCreateFlags, VkFenceCreateInfo, VkStructureType_VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
     create_info_builder,

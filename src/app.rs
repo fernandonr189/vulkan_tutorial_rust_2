@@ -3,8 +3,6 @@ use std::{
     collections::HashSet,
     ffi::c_char,
     ptr::null_mut,
-    thread::sleep,
-    time::Duration,
 };
 
 use ffi_utils::StringFfi;
@@ -15,8 +13,9 @@ use glfw_bindings::{
     glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
-    UINT32_MAX, VK_KHR_SWAPCHAIN_EXTENSION_NAME, VkApplicationInfo, VkAttachmentDescription,
-    VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR,
+    UINT32_MAX, VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_SUBPASS_EXTERNAL,
+    VkAccessFlagBits_VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VkApplicationInfo,
+    VkAttachmentDescription, VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR,
     VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_DONT_CARE, VkAttachmentReference,
     VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_DONT_CARE,
     VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_STORE, VkBlendFactor_VK_BLEND_FACTOR_ONE,
@@ -29,8 +28,7 @@ use vulkan_bindings::{
     VkCommandBufferAllocateInfo, VkCommandBufferBeginInfo,
     VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY, VkCommandPool,
     VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-    VkCommandPoolCreateFlags, VkCommandPoolCreateInfo,
-    VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
+    VkCommandPoolCreateInfo, VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
     VkCompositeAlphaFlagBitsKHR_VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     VkCullModeFlagBits_VK_CULL_MODE_BACK_BIT, VkDevice, VkDeviceCreateInfo,
     VkDeviceQueueCreateInfo, VkDynamicState, VkDynamicState_VK_DYNAMIC_STATE_SCISSOR,
@@ -49,8 +47,10 @@ use vulkan_bindings::{
     VkPipelineColorBlendStateCreateInfo, VkPipelineDynamicStateCreateInfo,
     VkPipelineInputAssemblyStateCreateInfo, VkPipelineLayout, VkPipelineLayoutCreateInfo,
     VkPipelineMultisampleStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
-    VkPipelineShaderStageCreateInfo, VkPipelineVertexInputStateCreateInfo,
-    VkPipelineViewportStateCreateInfo, VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentModeKHR,
+    VkPipelineShaderStageCreateInfo,
+    VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    VkPipelineVertexInputStateCreateInfo, VkPipelineViewportStateCreateInfo,
+    VkPolygonMode_VK_POLYGON_MODE_FILL, VkPresentInfoKHR, VkPresentModeKHR,
     VkPresentModeKHR_VK_PRESENT_MODE_FIFO_KHR, VkPresentModeKHR_VK_PRESENT_MODE_MAILBOX_KHR,
     VkPrimitiveTopology_VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkQueue,
     VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT, VkRect2D, VkRenderPass, VkRenderPassBeginInfo,
@@ -58,14 +58,14 @@ use vulkan_bindings::{
     VkSemaphoreCreateInfo, VkShaderModule, VkShaderModuleCreateInfo,
     VkShaderStageFlagBits_VK_SHADER_STAGE_FRAGMENT_BIT,
     VkShaderStageFlagBits_VK_SHADER_STAGE_VERTEX_BIT, VkSharingMode_VK_SHARING_MODE_CONCURRENT,
-    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE,
-    VkSubpassDescription, VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR,
-    VkSwapchainCreateInfoKHR, VkSwapchainKHR, VkViewport, vk_acquire_next_image_khr,
-    vk_allocate_command_buffers, vk_begin_command_buffer, vk_cmd_begin_render_pass,
-    vk_cmd_bind_pipeline, vk_cmd_draw, vk_cmd_end_render_pass, vk_cmd_set_scissor,
-    vk_cmd_set_viewport, vk_create_command_pool, vk_create_fence, vk_create_framebuffer,
-    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
-    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubmitInfo,
+    VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE, VkSubpassDependency, VkSubpassDescription,
+    VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR,
+    VkSwapchainKHR, VkViewport, vk_acquire_next_image_khr, vk_allocate_command_buffers,
+    vk_begin_command_buffer, vk_cmd_begin_render_pass, vk_cmd_bind_pipeline, vk_cmd_draw,
+    vk_cmd_end_render_pass, vk_cmd_set_scissor, vk_cmd_set_viewport, vk_create_command_pool,
+    vk_create_fence, vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view,
+    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
     vk_create_semaphore, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool,
     vk_destroy_device, vk_destroy_fence, vk_destroy_framebuffer, vk_destroy_graphics_pipeline,
     vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
@@ -77,7 +77,8 @@ use vulkan_bindings::{
     vk_get_physical_device_surface_capabilities_khr, vk_get_physical_device_surface_formats_khr,
     vk_get_physical_device_surface_present_modes_khr, vk_get_physical_device_surface_support_khr,
     vk_get_supported_extensions, vk_get_swapchain_images_khr, vk_make_api_version, vk_make_version,
-    vk_reset_fences, vk_wait_for_fences,
+    vk_queue_present_khr, vk_queue_submit, vk_reset_command_buffer, vk_reset_fences,
+    vk_wait_for_fences,
 };
 
 const DEBUG_ENABLED: bool = cfg!(debug_assertions);
@@ -242,7 +243,9 @@ impl App {
 
         let swapchain_support_details = self.vk_query_swapchain_support(device);
 
-        return device_features.geometryShader == 1
+        return device_properties.deviceType
+            == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+            && device_features.geometryShader == 1
             && queue_family_indices.is_complete()
             && extensions_supported
             && swapchain_support_details.is_swapchain_adequate();
@@ -721,6 +724,19 @@ impl App {
             .set_initial_layout(VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED)
             .set_final_layout(VkImageLayout_VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
+        let mut dependency = VkSubpassDependency::default();
+        dependency
+            .set_src_stage_mask(
+                VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            )
+            .set_dst_stage_mask(
+                VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            )
+            .set_src_subpass(VK_SUBPASS_EXTERNAL as u32)
+            .set_dst_subpass(0)
+            .set_src_access_mask(0)
+            .set_dst_access_mask(VkAccessFlagBits_VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
         let mut color_attachment_ref = VkAttachmentReference::default();
         color_attachment_ref
             .set_attachment(0)
@@ -737,7 +753,9 @@ impl App {
             .set_attachment_count(1)
             .set_p_attachments(&color_attachment)
             .set_subpass_count(1)
-            .set_p_subpasses(&subpass_description);
+            .set_p_subpasses(&subpass_description)
+            .set_dependency_count(1)
+            .set_p_dependencies(&dependency);
 
         self.vk_render_pass =
             match vk_create_render_pass(self.vk_logical_device.unwrap(), render_pass_info) {
@@ -916,6 +934,49 @@ impl App {
             Ok(index) => index,
             Err(err) => panic!("Failed to acquire next image: {:?}", err),
         };
+
+        match vk_reset_command_buffer(self.vk_command_buffer.unwrap(), 0) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to reset command buffer: {:?}", err),
+        }
+
+        self.vk_record_command_buffer(self.vk_command_buffer.unwrap(), image_index);
+
+        let wait_semaphores = self.vk_image_available_semaphore.unwrap();
+        let signal_semaphores = self.vk_render_finished_semaphore.unwrap();
+        let wait_stages = VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        let mut submit_info = VkSubmitInfo::default();
+        submit_info
+            .set_wait_semaphore_count(1)
+            .set_p_wait_semaphores(&wait_semaphores)
+            .set_p_wait_dst_stage_mask(&wait_stages)
+            .set_command_buffer_count(1)
+            .set_p_command_buffers(&self.vk_command_buffer.unwrap())
+            .set_signal_semaphore_count(1)
+            .set_p_signal_semaphores(&signal_semaphores);
+
+        match vk_queue_submit(
+            self.vk_graphics_queue.unwrap(),
+            1,
+            &submit_info,
+            self.vk_in_flight_fence.unwrap(),
+        ) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to submit queue: {:?}", err),
+        }
+
+        let mut present_info = VkPresentInfoKHR::default();
+        present_info
+            .set_wait_semaphore_count(1)
+            .set_p_wait_semaphores(&signal_semaphores)
+            .set_swapchain_count(1)
+            .set_p_swapchains(&self.vk_swap_chain.unwrap())
+            .set_p_image_indices(&image_index);
+
+        match vk_queue_present_khr(self.vk_present_queue.unwrap(), &present_info) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to present image: {:?}", err),
+        }
     }
 
     // GLFW FUNCTIONS
@@ -932,7 +993,7 @@ impl App {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
         glfw_window_hint(GLFW_RESIZABLE, GLFW_FALSE);
-        self.window = match glfw_create_window(600, 800, "Vulkan") {
+        self.window = match glfw_create_window(800, 600, "Vulkan") {
             Ok(window) => Some(window),
             Err(err) => panic!("Failed to create window: {:?}", err),
         };
