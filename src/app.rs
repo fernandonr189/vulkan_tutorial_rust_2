@@ -3,6 +3,8 @@ use std::{
     collections::HashSet,
     ffi::c_char,
     ptr::null_mut,
+    thread::sleep,
+    time::Duration,
 };
 
 use ffi_utils::StringFfi;
@@ -1014,11 +1016,11 @@ impl App {
 
     fn vk_cleanup_swapchain(self: &mut Self) {
         let device = self.vk_logical_device.unwrap();
-        for swapchain_framebuffer in self.vk_swap_chain_framebuffers.iter_mut() {
-            vk_destroy_framebuffer(device, *swapchain_framebuffer);
+        for swapchain_framebuffer in self.vk_swap_chain_framebuffers.drain(..) {
+            vk_destroy_framebuffer(device, swapchain_framebuffer);
         }
-        for swapchain_image_view in self.vk_swap_chain_image_views.iter_mut() {
-            vk_destroy_image_view(device, *swapchain_image_view);
+        for swapchain_image_view in self.vk_swap_chain_image_views.drain(..) {
+            vk_destroy_image_view(device, swapchain_image_view);
         }
         if let Some(swapchain) = self.vk_swap_chain.take() {
             vk_destroy_swapchain_khr(device, swapchain);
@@ -1064,6 +1066,7 @@ impl App {
         while !glfw_window_should_close(self.window.unwrap()) {
             glfw_poll_events();
             self.draw_frame();
+            sleep(Duration::from_millis(165 / 60));
         }
 
         match vk_device_wait_idle(self.vk_logical_device.unwrap()) {
@@ -1118,7 +1121,7 @@ impl App {
                 vk_destroy_render_pass(device, render_pass);
                 println!("Render pass destroyed");
             }
-            for (i, &image_view) in self.vk_swap_chain_image_views.iter().enumerate() {
+            for (i, image_view) in self.vk_swap_chain_image_views.drain(..).enumerate() {
                 if !image_view.is_null() {
                     vk_destroy_image_view(device, image_view);
                     println!("Image view destroyed: {}", i);
