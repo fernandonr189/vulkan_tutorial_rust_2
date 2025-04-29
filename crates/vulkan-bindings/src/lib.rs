@@ -516,17 +516,22 @@ pub fn vk_create_command_pool(
 pub fn vk_allocate_command_buffers(
     device: VkDevice,
     command_buffer_allocate_info: VkCommandBufferAllocateInfo,
-) -> Result<VkCommandBuffer, VulkanError> {
+    command_buffer_count: u32,
+) -> Result<Vec<VkCommandBuffer>, VulkanError> {
     unsafe {
-        let mut command_buffer: VkCommandBuffer = std::mem::zeroed();
+        let mut command_buffers: Vec<VkCommandBuffer> =
+            vec![std::mem::zeroed(); command_buffer_count as usize];
 
-        let result =
-            vkAllocateCommandBuffers(device, &command_buffer_allocate_info, &mut command_buffer);
+        let result = vkAllocateCommandBuffers(
+            device,
+            &command_buffer_allocate_info,
+            command_buffers.as_mut_ptr(),
+        );
 
         if result != VkResult_VK_SUCCESS {
             Err(VulkanError::CouldNotAllocateCommandBuffers)
         } else {
-            Ok(command_buffer)
+            Ok(command_buffers)
         }
     }
 }

@@ -86,6 +86,7 @@ static VALIDATION_LAYERS: &[&str] = &["VK_LAYER_KHRONOS_validation"];
 static REQUIRED_EXTENSIONS: &[&[u8]] = &[VK_KHR_SWAPCHAIN_EXTENSION_NAME];
 const VERT_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shader.vert.spv"));
 const FRAG_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shader.frag.spv"));
+const FRAMES_IN_FLIGHT: usize = 2;
 
 #[derive(Default)]
 pub struct App {
@@ -106,10 +107,11 @@ pub struct App {
     vk_graphics_pipeline: Option<VkPipeline>,
     vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
     vk_command_pool: Option<VkCommandPool>,
-    vk_command_buffer: Option<VkCommandBuffer>,
-    vk_image_available_semaphore: Option<VkSemaphore>,
-    vk_render_finished_semaphore: Option<VkSemaphore>,
-    vk_in_flight_fence: Option<VkFence>,
+    vk_command_buffer: Option<Vec<VkCommandBuffer>>,
+    vk_image_available_semaphore: Option<Vec<VkSemaphore>>,
+    vk_render_finished_semaphore: Option<Vec<VkSemaphore>>,
+    vk_in_flight_fence: Option<Vec<VkFence>>,
+    current_frame: usize,
 }
 
 impl App {
@@ -805,10 +807,10 @@ impl App {
         alloc_info
             .set_command_pool(self.vk_command_pool.unwrap())
             .set_level(VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
-            .set_command_buffer_count(1);
+            .set_command_buffer_count(2);
 
         self.vk_command_buffer =
-            match vk_allocate_command_buffers(self.vk_logical_device.unwrap(), alloc_info) {
+            match vk_allocate_command_buffers(self.vk_logical_device.unwrap(), alloc_info, 2) {
                 Ok(command_buffer) => Some(command_buffer),
                 Err(err) => panic!("Failed to allocate command buffers: {:?}", err),
             };
@@ -884,43 +886,59 @@ impl App {
 
     fn vk_create_sync_objects(self: &mut Self) {
         let semaphore_info = VkSemaphoreCreateInfo::default();
+        let mut fence_info = VkFenceCreateInfo::default();
+        fence_info.set_flags(VkFenceCreateFlagBits_VK_FENCE_CREATE_SIGNALED_BIT);
 
-        self.vk_image_available_semaphore =
+        let mut images_available = Vec::new();
+        let mut render_finished = Vec::new();
+        let mut in_flight = Vec::new();
+
+        for _i in 0..FRAMES_IN_FLIGHT {
             match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
-                Ok(semaphore) => Some(semaphore),
+                Ok(semaphore) => {
+                    images_available.push(semaphore);
+                }
                 Err(err) => panic!("Failed to create image available semaphore: {:?}", err),
             };
 
-        self.vk_render_finished_semaphore =
             match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
-                Ok(semaphore) => Some(semaphore),
+                Ok(semaphore) => {
+                    render_finished.push(semaphore);
+                }
                 Err(err) => panic!("Failed to create render finished semaphore: {:?}", err),
             };
 
-        let mut fence_info = VkFenceCreateInfo::default();
-        fence_info.set_flags(VkFenceCreateFlagBits_VK_FENCE_CREATE_SIGNALED_BIT);
-        self.vk_in_flight_fence = match vk_create_fence(self.vk_logical_device.unwrap(), fence_info)
-        {
-            Ok(fence) => Some(fence),
-            Err(err) => panic!("Failed to create in-flight fence: {:?}", err),
-        };
+            match vk_create_fence(self.vk_logical_device.unwrap(), fence_info) {
+                Ok(fence) => {
+                    in_flight.push(fence);
+                }
+                Err(err) => panic!("Failed to create in-flight fence: {:?}", err),
+            };
+        }
+
+        self.vk_image_available_semaphore = Some(images_available);
+        self.vk_render_finished_semaphore = Some(render_finished);
+        self.vk_in_flight_fence = Some(in_flight);
     }
     fn draw_frame(self: &mut Self) {
+        let current_frame = self.current_frame;
+        let fence = self.vk_in_flight_fence.clone().unwrap()[current_frame];
+        let images_available_semaphore =
+            self.vk_image_available_semaphore.clone().unwrap()[current_frame];
+        let render_finished_semaphore =
+            self.vk_render_finished_semaphore.clone().unwrap()[current_frame];
+        let command_buffer = self.vk_command_buffer.clone().unwrap()[current_frame];
         match vk_wait_for_fences(
             self.vk_logical_device.unwrap(),
             1,
-            &self.vk_in_flight_fence.unwrap(),
+            &fence,
             UINT32_MAX as u64,
         ) {
             Ok(()) => (),
             Err(err) => panic!("Failed to wait for fences: {:?}", err),
         };
 
-        match vk_reset_fences(
-            self.vk_logical_device.unwrap(),
-            1,
-            &self.vk_in_flight_fence.unwrap(),
-        ) {
+        match vk_reset_fences(self.vk_logical_device.unwrap(), 1, &fence) {
             Ok(()) => (),
             Err(err) => panic!("Failed to reset fences: {:?}", err),
         };
@@ -929,38 +947,31 @@ impl App {
             self.vk_logical_device.unwrap(),
             self.vk_swap_chain.unwrap(),
             UINT32_MAX as u64,
-            self.vk_image_available_semaphore.unwrap(),
+            images_available_semaphore,
         ) {
             Ok(index) => index,
             Err(err) => panic!("Failed to acquire next image: {:?}", err),
         };
 
-        match vk_reset_command_buffer(self.vk_command_buffer.unwrap(), 0) {
+        match vk_reset_command_buffer(command_buffer, 0) {
             Ok(()) => (),
             Err(err) => panic!("Failed to reset command buffer: {:?}", err),
         }
 
-        self.vk_record_command_buffer(self.vk_command_buffer.unwrap(), image_index);
+        self.vk_record_command_buffer(command_buffer, image_index);
 
-        let wait_semaphores = self.vk_image_available_semaphore.unwrap();
-        let signal_semaphores = self.vk_render_finished_semaphore.unwrap();
         let wait_stages = VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         let mut submit_info = VkSubmitInfo::default();
         submit_info
             .set_wait_semaphore_count(1)
-            .set_p_wait_semaphores(&wait_semaphores)
+            .set_p_wait_semaphores(&images_available_semaphore)
             .set_p_wait_dst_stage_mask(&wait_stages)
             .set_command_buffer_count(1)
-            .set_p_command_buffers(&self.vk_command_buffer.unwrap())
+            .set_p_command_buffers(&command_buffer)
             .set_signal_semaphore_count(1)
-            .set_p_signal_semaphores(&signal_semaphores);
+            .set_p_signal_semaphores(&render_finished_semaphore);
 
-        match vk_queue_submit(
-            self.vk_graphics_queue.unwrap(),
-            1,
-            &submit_info,
-            self.vk_in_flight_fence.unwrap(),
-        ) {
+        match vk_queue_submit(self.vk_graphics_queue.unwrap(), 1, &submit_info, fence) {
             Ok(()) => (),
             Err(err) => panic!("Failed to submit queue: {:?}", err),
         }
@@ -968,7 +979,7 @@ impl App {
         let mut present_info = VkPresentInfoKHR::default();
         present_info
             .set_wait_semaphore_count(1)
-            .set_p_wait_semaphores(&signal_semaphores)
+            .set_p_wait_semaphores(&render_finished_semaphore)
             .set_swapchain_count(1)
             .set_p_swapchains(&self.vk_swap_chain.unwrap())
             .set_p_image_indices(&image_index);
@@ -977,6 +988,8 @@ impl App {
             Ok(()) => (),
             Err(err) => panic!("Failed to present image: {:?}", err),
         }
+
+        self.current_frame = (self.current_frame + 1) % FRAMES_IN_FLIGHT;
     }
 
     // GLFW FUNCTIONS
@@ -1013,19 +1026,25 @@ impl App {
 
     fn cleanup(&mut self) {
         if let Some(device) = self.vk_logical_device.take() {
-            if let Some(fence) = self.vk_in_flight_fence.take() {
-                vk_destroy_fence(device, fence);
-                println!("In-flight fence destroyed");
+            if let Some(fences) = self.vk_in_flight_fence.take() {
+                for fence in fences {
+                    vk_destroy_fence(device, fence);
+                    println!("In-flight fence destroyed");
+                }
             }
 
-            if let Some(semaphore) = self.vk_image_available_semaphore.take() {
-                vk_destroy_semaphore(device, semaphore);
-                println!("Image available semaphore destroyed");
+            if let Some(semaphores) = self.vk_image_available_semaphore.take() {
+                for semaphore in semaphores {
+                    vk_destroy_semaphore(device, semaphore);
+                    println!("Image available semaphore destroyed");
+                }
             }
 
-            if let Some(semaphore) = self.vk_render_finished_semaphore.take() {
-                vk_destroy_semaphore(device, semaphore);
-                println!("Render finished semaphore destroyed");
+            if let Some(semaphores) = self.vk_render_finished_semaphore.take() {
+                for semaphore in semaphores {
+                    vk_destroy_semaphore(device, semaphore);
+                    println!("Render finished semaphore destroyed");
+                }
             }
 
             if let Some(command_pool) = self.vk_command_pool.take() {
