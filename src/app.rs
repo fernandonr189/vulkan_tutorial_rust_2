@@ -116,46 +116,53 @@ pub struct App {
     vk_in_flight_fence: Option<Vec<VkFence>>,
     current_frame: usize,
     framebuffer_resized: bool,
-    recreating_swapchain: bool,
 }
 
 impl App {
     pub fn run(self: &mut Self) {
-        self.init_window();
-        self.init_vulkan();
-        self.main_loop();
+        let window = self.init_window();
+        self.window = Some(window);
+        self.init_vulkan(window);
+        self.main_loop(window);
     }
 
     // VULKAN FUNCTIONS
 
-    fn init_vulkan(self: &mut Self) {
-        self.vk_create_instance();
+    fn init_vulkan(self: &mut Self, window: *mut GLFWwindow) {
+        let instance = self.vk_create_instance();
         println!("Instance created");
-        self.glfw_create_surface();
+        let surface = self.glfw_create_surface(instance, window);
         println!("Surface created");
-        self.vk_pick_physical_device();
+        let physical_device = self.vk_pick_physical_device(instance, surface);
         println!("Physical device picked");
-        self.vk_create_logical_device();
+        let queue_family_indices = self.vk_find_queue_families(physical_device, surface);
+        let logical_device = self.vk_create_logical_device(physical_device, queue_family_indices);
         println!("Logical device created");
-        self.vk_create_swap_chain();
+        let swapchain = self.vk_create_swap_chain(surface, physical_device, window, logical_device);
         println!("Swap chain created");
-        self.vk_create_image_views();
+        self.vk_create_image_views(logical_device);
         println!("Image views created");
-        self.vk_create_render_pass();
+        self.vk_create_render_pass(logical_device);
         println!("Render pass created");
-        self.vk_create_graphics_pipeline();
+        self.vk_create_graphics_pipeline(logical_device);
         println!("Graphics pipeline created");
-        self.vk_create_framebuffers();
+        self.vk_create_framebuffers(logical_device);
         println!("Framebuffers created");
-        self.vk_create_command_pool();
+        self.vk_create_command_pool(surface, physical_device, logical_device);
         println!("Command pool created");
-        self.vk_create_command_buffers();
+        self.vk_create_command_buffers(logical_device);
         println!("Command buffers created");
-        self.vk_create_sync_objects();
+        self.vk_create_sync_objects(logical_device);
         println!("Sync objects created");
+
+        self.vk_instance = Some(instance);
+        self.vk_surface_khr = Some(surface);
+        self.vk_physical_device = Some(physical_device);
+        self.vk_logical_device = Some(logical_device);
+        self.vk_swap_chain = Some(swapchain);
     }
 
-    fn vk_create_instance(self: &mut Self) {
+    fn vk_create_instance(self: &mut Self) -> VkInstance {
         if DEBUG_ENABLED && !self.vk_check_validation_layer_support() {
             panic!("Validation layers not available");
         }
@@ -182,12 +189,14 @@ impl App {
             Err(err) => panic!("Could not obtain supported extensions: {:?}", err),
         };
 
-        self.vk_instance = match vk_create_instance(&instance_create_info) {
+        let instance = match vk_create_instance(&instance_create_info) {
             Ok(instance) => Some(instance),
             Err(err) => panic!("Could not create instance: {:?}", err),
-        };
+        }
+        .unwrap();
 
         self.vk_check_validation_layer_support();
+        instance
     }
 
     fn vk_check_validation_layer_support(self: &mut Self) -> bool {
@@ -215,40 +224,52 @@ impl App {
         return true;
     }
 
-    fn vk_pick_physical_device(self: &mut Self) {
-        let (_device_count, physical_devices) =
-            match vk_get_available_devices(self.vk_instance.unwrap()) {
-                Ok(devices) => devices,
-                Err(err) => panic!("Could not obtain avaliable devices: {:?}", err),
-            };
+    fn vk_pick_physical_device(
+        self: &mut Self,
+        instance: VkInstance,
+        surface: VkSurfaceKHR,
+    ) -> VkPhysicalDevice {
+        let (_device_count, physical_devices) = match vk_get_available_devices(instance) {
+            Ok(devices) => devices,
+            Err(err) => panic!("Could not obtain avaliable devices: {:?}", err),
+        };
 
-        for device in &physical_devices {
-            if self.vk_is_device_suitable(*device) {
-                self.vk_physical_device = Some(*device);
-                break;
+        let physical_device = {
+            let mut physical_device = None;
+            for device in physical_devices {
+                if self.vk_is_device_suitable(device, surface) {
+                    physical_device = Some(device);
+                    break;
+                }
             }
-        }
 
-        if self.vk_physical_device.is_none() {
-            panic!("No suitable devices found!")
-        }
+            if let None = physical_device {
+                panic!("No suitable devices found!")
+            }
+            physical_device.unwrap()
+        };
 
-        let device_properties = vk_get_physical_device_properties(self.vk_physical_device.unwrap());
+        let device_properties = vk_get_physical_device_properties(physical_device);
         println!(
             "Device Name: {}",
             StringFfi::from_i8_array(&device_properties.deviceName).to_string()
         );
+        physical_device
     }
 
-    fn vk_is_device_suitable(self: &mut Self, device: VkPhysicalDevice) -> bool {
+    fn vk_is_device_suitable(
+        self: &mut Self,
+        device: VkPhysicalDevice,
+        surface: VkSurfaceKHR,
+    ) -> bool {
         let device_properties = vk_get_physical_device_properties(device);
         let device_features = vk_get_physical_device_features(device);
 
-        let queue_family_indices = self.vk_find_queue_families(device);
+        let queue_family_indices = self.vk_find_queue_families(device, surface);
 
         let extensions_supported = self.vk_check_device_extension_support(device);
 
-        let swapchain_support_details = self.vk_query_swapchain_support(device);
+        let swapchain_support_details = self.vk_query_swapchain_support(device, surface);
 
         return device_properties.deviceType
             == VkPhysicalDeviceType_VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
@@ -282,7 +303,11 @@ impl App {
         required_extensions_set.is_empty()
     }
 
-    fn vk_find_queue_families(self: &mut Self, device: VkPhysicalDevice) -> QueueFamilyIndices {
+    fn vk_find_queue_families(
+        self: &mut Self,
+        device: VkPhysicalDevice,
+        vulkan_surface: VkSurfaceKHR,
+    ) -> QueueFamilyIndices {
         let mut indices = QueueFamilyIndices::default();
 
         let queue_families = match vk_get_physical_device_queue_family_properties(device) {
@@ -298,7 +323,7 @@ impl App {
             let surface_support = match vk_get_physical_device_surface_support_khr(
                 device,
                 i as u32,
-                self.vk_surface_khr.unwrap(),
+                vulkan_surface,
             ) {
                 Ok(supported) => supported,
                 Err(err) => panic!("Failed to get surface support: {:?}", err),
@@ -315,13 +340,18 @@ impl App {
         indices
     }
 
-    fn vk_create_logical_device(self: &mut Self) {
-        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+    fn vk_create_logical_device(
+        self: &mut Self,
+        physical_device: VkPhysicalDevice,
+        queue_family_indices: QueueFamilyIndices,
+    ) -> VkDevice {
+        let graphics_family = queue_family_indices.graphics_family.unwrap();
+        let present_family = queue_family_indices.present_family.unwrap();
 
         let mut queue_create_infos: Vec<VkDeviceQueueCreateInfo> = Vec::new();
         let mut unique_families = HashSet::<u32>::new();
-        unique_families.insert(queue_family_indices.graphics_family.unwrap());
-        unique_families.insert(queue_family_indices.present_family.unwrap());
+        unique_families.insert(graphics_family);
+        unique_families.insert(present_family);
 
         let priority = 1.0;
         for family in unique_families {
@@ -336,7 +366,7 @@ impl App {
         let extension_names: Vec<*const u8> =
             REQUIRED_EXTENSIONS.iter().map(|s| s.as_ptr()).collect();
 
-        let device_features = vk_get_physical_device_features(self.vk_physical_device.unwrap());
+        let device_features = vk_get_physical_device_features(physical_device);
         let mut device_create_info = VkDeviceCreateInfo::default();
         device_create_info
             .set_p_queue_create_infos(queue_create_infos.as_ptr())
@@ -357,65 +387,59 @@ impl App {
             device_create_info.set_enabled_layer_count(0);
         }
 
-        self.vk_logical_device =
-            match vk_create_logical_device(self.vk_physical_device.unwrap(), &device_create_info) {
-                Ok(device) => Some(device),
-                Err(err) => panic!("Failed to create logical device: {:?}", err),
-            };
-
-        self.vk_graphics_queue = Some(vk_get_device_queue(
-            self.vk_logical_device.unwrap(),
-            queue_family_indices.graphics_family.unwrap(),
-            0,
-        ));
-
-        self.vk_present_queue = Some(vk_get_device_queue(
-            self.vk_logical_device.unwrap(),
-            queue_family_indices.present_family.unwrap(),
-            0,
-        ));
+        let logical_device = match vk_create_logical_device(physical_device, &device_create_info) {
+            Ok(device) => Some(device),
+            Err(err) => panic!("Failed to create logical device: {:?}", err),
+        }
+        .unwrap();
+        self.vk_graphics_queue = Some(vk_get_device_queue(logical_device, graphics_family, 0));
+        self.vk_present_queue = Some(vk_get_device_queue(logical_device, present_family, 0));
+        logical_device
     }
 
     fn vk_query_swapchain_support(
         self: &mut Self,
         device: VkPhysicalDevice,
+        surface: VkSurfaceKHR,
     ) -> SwapChainSupportDetails {
-        let surface_capabilities = match vk_get_physical_device_surface_capabilities_khr(
-            device,
-            self.vk_surface_khr.unwrap(),
-        ) {
-            Ok(capabilities) => capabilities,
-            Err(err) => panic!("Failed to query swapchain support: {:?}", err),
-        };
+        let surface_capabilities =
+            match vk_get_physical_device_surface_capabilities_khr(device, surface) {
+                Ok(capabilities) => capabilities,
+                Err(err) => panic!("Failed to query swapchain support: {:?}", err),
+            };
         let mut swapchain_support_details = SwapChainSupportDetails::new(surface_capabilities);
 
-        swapchain_support_details.formats = match vk_get_physical_device_surface_formats_khr(
-            device,
-            self.vk_surface_khr.unwrap(),
-        ) {
-            Ok(formats) => formats,
-            Err(err) => panic!("Failed to query swapchain formats: {:?}", err),
-        };
+        swapchain_support_details.formats =
+            match vk_get_physical_device_surface_formats_khr(device, surface) {
+                Ok(formats) => formats,
+                Err(err) => panic!("Failed to query swapchain formats: {:?}", err),
+            };
 
         swapchain_support_details.present_modes =
-            match vk_get_physical_device_surface_present_modes_khr(
-                device,
-                self.vk_surface_khr.unwrap(),
-            ) {
+            match vk_get_physical_device_surface_present_modes_khr(device, surface) {
                 Ok(present_modes) => present_modes,
                 Err(err) => panic!("Failed to query swapchain present modes: {:?}", err),
             };
         swapchain_support_details
     }
 
-    fn vk_create_swap_chain(&mut self) {
-        let swapchain_support_details =
-            self.vk_query_swapchain_support(self.vk_physical_device.unwrap());
+    fn vk_create_swap_chain(
+        &mut self,
+        surface: VkSurfaceKHR,
+        physical_device: VkPhysicalDevice,
+        window: *mut GLFWwindow,
+        logical_device: VkDevice,
+    ) -> VkSwapchainKHR {
+        let queue_family_indices = self.vk_find_queue_families(physical_device, surface);
+        let graphics_family_indices = queue_family_indices.graphics_family.unwrap();
+        let present_family_indices = queue_family_indices.present_family.unwrap();
+
+        let swapchain_support_details = self.vk_query_swapchain_support(physical_device, surface);
 
         let surface_format = self.vk_choose_swap_surface_format(swapchain_support_details.formats);
         let present_mode =
             self.vk_choose_swap_present_mode(swapchain_support_details.present_modes);
-        let extent = self.vk_choose_swap_extent(swapchain_support_details.capabilities);
+        let extent = self.vk_choose_swap_extent(swapchain_support_details.capabilities, window);
 
         let mut image_count = swapchain_support_details.capabilities.minImageCount + 1;
 
@@ -427,7 +451,7 @@ impl App {
 
         let mut swapchain_create_info = VkSwapchainCreateInfoKHR::default();
         swapchain_create_info
-            .set_surface(self.vk_surface_khr.unwrap())
+            .set_surface(surface)
             .set_min_image_count(image_count)
             .set_image_format(surface_format.format)
             .set_image_color_space(surface_format.colorSpace)
@@ -435,11 +459,7 @@ impl App {
             .set_image_array_layers(1)
             .set_image_usage(VkImageUsageFlagBits_VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
-        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
-        let queue_family_indices_vec = vec![
-            queue_family_indices.graphics_family.unwrap(),
-            queue_family_indices.present_family.unwrap(),
-        ];
+        let queue_family_indices_vec = vec![graphics_family_indices, present_family_indices];
 
         if queue_family_indices.are_equal() {
             swapchain_create_info
@@ -458,22 +478,20 @@ impl App {
             .set_clipped(true as u32)
             .set_old_swapchain(null_mut());
 
-        self.vk_swap_chain =
-            match vk_create_swapchain_khr(self.vk_logical_device.unwrap(), swapchain_create_info) {
-                Ok(swap_chain) => Some(swap_chain),
-                Err(err) => panic!("Failed to create swap chain: {:?}", err),
-            };
+        let swapchain = match vk_create_swapchain_khr(logical_device, swapchain_create_info) {
+            Ok(swap_chain) => Some(swap_chain),
+            Err(err) => panic!("Failed to create swap chain: {:?}", err),
+        }
+        .unwrap();
 
-        self.vk_swap_chain_images = match vk_get_swapchain_images_khr(
-            self.vk_logical_device.unwrap(),
-            self.vk_swap_chain.unwrap(),
-        ) {
+        self.vk_swap_chain_images = match vk_get_swapchain_images_khr(logical_device, swapchain) {
             Ok(images) => images,
             Err(err) => panic!("Failed to get swap chain images: {:?}", err),
         };
 
         self.vk_swap_chain_image_format = Some(surface_format.format);
         self.vk_swap_chain_image_extent = Some(extent);
+        swapchain
     }
 
     fn vk_choose_swap_surface_format(
@@ -505,11 +523,12 @@ impl App {
     fn vk_choose_swap_extent(
         self: &mut Self,
         capabilities: VkSurfaceCapabilitiesKHR,
+        window: *mut GLFWwindow,
     ) -> VkExtent2D {
         if capabilities.currentExtent.width != u32::MAX {
             return capabilities.currentExtent;
         } else {
-            let (width, height) = glfw_get_framebuffer_size(self.window.unwrap());
+            let (width, height) = glfw_get_framebuffer_size(window);
 
             let mut actual_extent = VkExtent2D { width, height };
 
@@ -526,13 +545,16 @@ impl App {
         }
     }
 
-    fn vk_create_image_views(self: &mut Self) {
+    fn vk_create_image_views(self: &mut Self, logical_device: VkDevice) {
+        let swapchain_image_format = self.vk_swap_chain_image_format.unwrap();
+
+        let mut image_views: Vec<VkImageView> = Vec::with_capacity(self.vk_swap_chain_images.len());
         for swapchain_image in &self.vk_swap_chain_images {
             let mut image_view_create_info = VkImageViewCreateInfo::default();
             image_view_create_info
                 .set_image(*swapchain_image)
                 .set_view_type(VkImageViewType_VK_IMAGE_VIEW_TYPE_2D)
-                .set_format(self.vk_swap_chain_image_format.unwrap())
+                .set_format(swapchain_image_format)
                 .set_components(vulkan_bindings::VkComponentMapping {
                     r: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
                     g: VkComponentSwizzle_VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -547,17 +569,21 @@ impl App {
                     layerCount: 1,
                 });
 
-            self.vk_swap_chain_image_views.push(
-                match vk_create_image_view(self.vk_logical_device.unwrap(), image_view_create_info)
-                {
+            image_views.push(
+                match vk_create_image_view(logical_device, image_view_create_info) {
                     Ok(image_view) => image_view,
                     Err(err) => panic!("Failed to create image view: {:?}", err),
                 },
             );
         }
+        self.vk_swap_chain_image_views = image_views;
     }
 
-    fn vk_create_shader_module(self: &mut Self, code: &[u8]) -> VkShaderModule {
+    fn vk_create_shader_module(
+        self: &mut Self,
+        code: &[u8],
+        logical_device: VkDevice,
+    ) -> VkShaderModule {
         if code.len() % 4 != 0 {
             panic!("Shader code size is not a multiple of 4: {}", code.len());
         }
@@ -581,18 +607,19 @@ impl App {
         shader_create_info
             .set_code_size(code.len())
             .set_p_code(code_u32.as_ptr());
-        match vk_create_shader_module(self.vk_logical_device.unwrap(), shader_create_info) {
+        match vk_create_shader_module(logical_device, shader_create_info) {
             Ok(shader_module) => shader_module,
             Err(err) => panic!("Failed to create shader module: {:?}", err),
         }
     }
 
-    fn vk_create_graphics_pipeline(self: &mut Self) {
+    fn vk_create_graphics_pipeline(self: &mut Self, logical_device: VkDevice) {
+        let render_pass = self.vk_render_pass.unwrap();
         println!("Vertex shader size: {}", VERT_SHADER.len());
         println!("Fragment shader size: {}", FRAG_SHADER.len());
 
-        let vertex_shader_module = self.vk_create_shader_module(VERT_SHADER);
-        let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER);
+        let vertex_shader_module = self.vk_create_shader_module(VERT_SHADER, logical_device);
+        let fragment_shader_module = self.vk_create_shader_module(FRAG_SHADER, logical_device);
 
         let shaders_entry_point = StringFfi::from_string("main");
 
@@ -684,13 +711,13 @@ impl App {
             .set_layout_count(0)
             .set_push_constant_range_count(0);
 
-        self.vk_pipeline_layout = match vk_create_pipeline_layout(
-            self.vk_logical_device.unwrap(),
-            pipeline_layout_info,
-        ) {
+        let pipeline_layout = match vk_create_pipeline_layout(logical_device, pipeline_layout_info)
+        {
             Ok(layout) => Some(layout),
             Err(err) => panic!("Failed to create pipeline layout: {:?}", err),
-        };
+        }
+        .unwrap();
+        self.vk_pipeline_layout = Some(pipeline_layout);
 
         let mut pipeline_create_info = VkGraphicsPipelineCreateInfo::default();
         pipeline_create_info
@@ -703,26 +730,25 @@ impl App {
             .set_p_multisample_state(&multisample_create_info)
             .set_p_color_blend_state(&color_blending)
             .set_p_dynamic_state(&dynamic_state_create_info)
-            .set_layout(self.vk_pipeline_layout.unwrap())
-            .set_render_pass(self.vk_render_pass.unwrap())
+            .set_layout(pipeline_layout)
+            .set_render_pass(render_pass)
             .set_subpass(0);
 
-        self.vk_graphics_pipeline = match vk_create_graphics_pipeline(
-            self.vk_logical_device.unwrap(),
-            pipeline_create_info,
-        ) {
-            Ok(pipeline) => Some(pipeline),
-            Err(err) => panic!("Failed to create graphics pipeline: {:?}", err),
-        };
+        self.vk_graphics_pipeline =
+            match vk_create_graphics_pipeline(logical_device, pipeline_create_info) {
+                Ok(pipeline) => Some(pipeline),
+                Err(err) => panic!("Failed to create graphics pipeline: {:?}", err),
+            };
 
-        vk_destroy_shader_module(self.vk_logical_device.unwrap(), vertex_shader_module);
-        vk_destroy_shader_module(self.vk_logical_device.unwrap(), fragment_shader_module);
+        vk_destroy_shader_module(logical_device, vertex_shader_module);
+        vk_destroy_shader_module(logical_device, fragment_shader_module);
     }
 
-    fn vk_create_render_pass(self: &mut Self) {
+    fn vk_create_render_pass(self: &mut Self, logical_device: VkDevice) {
+        let swapchain_format = self.vk_swap_chain_image_format.unwrap();
         let mut color_attachment = VkAttachmentDescription::default();
         color_attachment
-            .set_format(self.vk_swap_chain_image_format.unwrap())
+            .set_format(swapchain_format)
             .set_samples(VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT)
             .set_load_op(VkAttachmentLoadOp_VK_ATTACHMENT_LOAD_OP_CLEAR)
             .set_store_op(VkAttachmentStoreOp_VK_ATTACHMENT_STORE_OP_STORE)
@@ -764,61 +790,68 @@ impl App {
             .set_dependency_count(1)
             .set_p_dependencies(&dependency);
 
-        self.vk_render_pass =
-            match vk_create_render_pass(self.vk_logical_device.unwrap(), render_pass_info) {
-                Ok(render_pass) => Some(render_pass),
-                Err(err) => panic!("Failed to create render pass: {:?}", err),
-            };
+        self.vk_render_pass = match vk_create_render_pass(logical_device, render_pass_info) {
+            Ok(render_pass) => Some(render_pass),
+            Err(err) => panic!("Failed to create render pass: {:?}", err),
+        };
     }
 
-    fn vk_create_framebuffers(self: &mut Self) {
+    fn vk_create_framebuffers(self: &mut Self, logical_device: VkDevice) {
+        let image_extent = self.vk_swap_chain_image_extent.unwrap();
+        let render_pass = self.vk_render_pass.unwrap();
         self.vk_swap_chain_framebuffers = Vec::with_capacity(self.vk_swap_chain_image_views.len());
         for image_view in self.vk_swap_chain_image_views.iter() {
             let attachments = *image_view;
 
             let mut framebuffer_info = VkFramebufferCreateInfo::default();
             framebuffer_info
-                .set_render_pass(self.vk_render_pass.unwrap())
+                .set_render_pass(render_pass)
                 .set_attachment_count(1)
                 .set_p_attachments(&attachments)
-                .set_width(self.vk_swap_chain_image_extent.unwrap().width)
-                .set_height(self.vk_swap_chain_image_extent.unwrap().height)
+                .set_width(image_extent.width)
+                .set_height(image_extent.height)
                 .set_layers(1);
 
-            match vk_create_framebuffer(self.vk_logical_device.unwrap(), framebuffer_info) {
+            match vk_create_framebuffer(logical_device, framebuffer_info) {
                 Ok(framebuffer) => self.vk_swap_chain_framebuffers.push(framebuffer),
                 Err(err) => panic!("Failed to create framebuffer: {:?}", err),
             }
         }
     }
 
-    fn vk_create_command_pool(self: &mut Self) {
-        let queue_family_indices = self.vk_find_queue_families(self.vk_physical_device.unwrap());
+    fn vk_create_command_pool(
+        self: &mut Self,
+        surface: VkSurfaceKHR,
+        physical_device: VkPhysicalDevice,
+        logical_device: VkDevice,
+    ) {
+        let queue_family_indices = self.vk_find_queue_families(physical_device, surface);
+        let graphics_queue_family_index = queue_family_indices.graphics_family.unwrap();
 
         let mut command_pool_info = VkCommandPoolCreateInfo::default();
         command_pool_info
             .set_flags(VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
-            .set_queue_family_index(queue_family_indices.graphics_family.unwrap());
+            .set_queue_family_index(graphics_queue_family_index);
 
-        self.vk_command_pool =
-            match vk_create_command_pool(self.vk_logical_device.unwrap(), command_pool_info) {
-                Ok(command_pool) => Some(command_pool),
-                Err(err) => panic!("Failed to create command pool: {:?}", err),
-            };
+        self.vk_command_pool = match vk_create_command_pool(logical_device, command_pool_info) {
+            Ok(command_pool) => Some(command_pool),
+            Err(err) => panic!("Failed to create command pool: {:?}", err),
+        };
     }
 
-    fn vk_create_command_buffers(self: &mut Self) {
+    fn vk_create_command_buffers(self: &mut Self, logical_device: VkDevice) {
+        let command_pool = self.vk_command_pool.unwrap();
+
         let mut alloc_info = VkCommandBufferAllocateInfo::default();
         alloc_info
-            .set_command_pool(self.vk_command_pool.unwrap())
+            .set_command_pool(command_pool)
             .set_level(VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
             .set_command_buffer_count(2);
 
-        self.vk_command_buffer =
-            match vk_allocate_command_buffers(self.vk_logical_device.unwrap(), alloc_info, 2) {
-                Ok(command_buffer) => Some(command_buffer),
-                Err(err) => panic!("Failed to allocate command buffers: {:?}", err),
-            };
+        self.vk_command_buffer = match vk_allocate_command_buffers(logical_device, alloc_info, 2) {
+            Ok(command_buffer) => Some(command_buffer),
+            Err(err) => panic!("Failed to allocate command buffers: {:?}", err),
+        };
     }
 
     fn vk_record_command_buffer(
@@ -826,6 +859,10 @@ impl App {
         command_buffer: VkCommandBuffer,
         image_index: u32,
     ) {
+        let renderpass = self.vk_render_pass.unwrap();
+        let image_extent = self.vk_swap_chain_image_extent.unwrap();
+        let graphics_pipeline = self.vk_graphics_pipeline.unwrap();
+
         let mut begin_info = VkCommandBufferBeginInfo::default();
         begin_info.set_flags(0);
 
@@ -841,11 +878,11 @@ impl App {
         };
         let mut render_pass_begin_info = VkRenderPassBeginInfo::default();
         render_pass_begin_info
-            .set_render_pass(self.vk_render_pass.unwrap())
+            .set_render_pass(renderpass)
             .set_framebuffer(self.vk_swap_chain_framebuffers[image_index as usize])
             .set_render_area(vulkan_bindings::VkRect2D {
                 offset: vulkan_bindings::VkOffset2D { x: 0, y: 0 },
-                extent: self.vk_swap_chain_image_extent.unwrap(),
+                extent: image_extent,
             })
             .set_p_clear_values(&clear_color)
             .set_clear_value_count(1);
@@ -858,7 +895,7 @@ impl App {
 
         vk_cmd_bind_pipeline(
             command_buffer,
-            self.vk_graphics_pipeline.unwrap(),
+            graphics_pipeline,
             VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS,
         );
 
@@ -866,8 +903,8 @@ impl App {
         viewport
             .set_x(0.0)
             .set_y(0.0)
-            .set_width(self.vk_swap_chain_image_extent.unwrap().width as f32)
-            .set_height(self.vk_swap_chain_image_extent.unwrap().height as f32)
+            .set_width(image_extent.width as f32)
+            .set_height(image_extent.height as f32)
             .set_min_depth(0.0)
             .set_max_depth(1.0);
 
@@ -876,7 +913,7 @@ impl App {
         let mut scissor = VkRect2D::default();
         scissor
             .set_offset(VkOffset2D { x: 0, y: 0 })
-            .set_extent(self.vk_swap_chain_image_extent.unwrap());
+            .set_extent(image_extent);
 
         vk_cmd_set_scissor(command_buffer, scissor);
 
@@ -889,7 +926,7 @@ impl App {
         }
     }
 
-    fn vk_create_sync_objects(self: &mut Self) {
+    fn vk_create_sync_objects(self: &mut Self, logical_device: VkDevice) {
         let semaphore_info = VkSemaphoreCreateInfo::default();
         let mut fence_info = VkFenceCreateInfo::default();
         fence_info.set_flags(VkFenceCreateFlagBits_VK_FENCE_CREATE_SIGNALED_BIT);
@@ -899,21 +936,21 @@ impl App {
         let mut in_flight = Vec::new();
 
         for _i in 0..FRAMES_IN_FLIGHT {
-            match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
+            match vk_create_semaphore(logical_device, semaphore_info) {
                 Ok(semaphore) => {
                     images_available.push(semaphore);
                 }
                 Err(err) => panic!("Failed to create image available semaphore: {:?}", err),
             };
 
-            match vk_create_semaphore(self.vk_logical_device.unwrap(), semaphore_info) {
+            match vk_create_semaphore(logical_device, semaphore_info) {
                 Ok(semaphore) => {
                     render_finished.push(semaphore);
                 }
                 Err(err) => panic!("Failed to create render finished semaphore: {:?}", err),
             };
 
-            match vk_create_fence(self.vk_logical_device.unwrap(), fence_info) {
+            match vk_create_fence(logical_device, fence_info) {
                 Ok(fence) => {
                     in_flight.push(fence);
                 }
@@ -926,6 +963,10 @@ impl App {
         self.vk_in_flight_fence = Some(in_flight);
     }
     fn draw_frame(self: &mut Self) {
+        let logical_device = self.vk_logical_device.unwrap();
+        let graphics_queue = self.vk_graphics_queue.unwrap();
+        let present_queue = self.vk_present_queue.unwrap();
+        let swapchain = self.vk_swap_chain.unwrap();
         let current_frame = self.current_frame;
         let fence = self.vk_in_flight_fence.clone().unwrap()[current_frame];
         let images_available_semaphore =
@@ -933,19 +974,14 @@ impl App {
         let render_finished_semaphore =
             self.vk_render_finished_semaphore.clone().unwrap()[current_frame];
         let command_buffer = self.vk_command_buffer.clone().unwrap()[current_frame];
-        match vk_wait_for_fences(
-            self.vk_logical_device.unwrap(),
-            1,
-            &fence,
-            UINT32_MAX as u64,
-        ) {
+        match vk_wait_for_fences(logical_device, 1, &fence, UINT32_MAX as u64) {
             Ok(()) => (),
             Err(err) => panic!("Failed to wait for fences: {:?}", err),
         };
 
         let image_index = match vk_acquire_next_image_khr(
-            self.vk_logical_device.unwrap(),
-            self.vk_swap_chain.unwrap(),
+            logical_device,
+            swapchain,
             UINT32_MAX as u64,
             images_available_semaphore,
         ) {
@@ -960,7 +996,7 @@ impl App {
             },
         };
 
-        match vk_reset_fences(self.vk_logical_device.unwrap(), 1, &fence) {
+        match vk_reset_fences(logical_device, 1, &fence) {
             Ok(()) => (),
             Err(err) => panic!("Failed to reset fences: {:?}", err),
         };
@@ -983,7 +1019,7 @@ impl App {
             .set_signal_semaphore_count(1)
             .set_p_signal_semaphores(&render_finished_semaphore);
 
-        match vk_queue_submit(self.vk_graphics_queue.unwrap(), 1, &submit_info, fence) {
+        match vk_queue_submit(graphics_queue, 1, &submit_info, fence) {
             Ok(()) => (),
             Err(err) => panic!("Failed to submit queue: {:?}", err),
         }
@@ -993,10 +1029,10 @@ impl App {
             .set_wait_semaphore_count(1)
             .set_p_wait_semaphores(&render_finished_semaphore)
             .set_swapchain_count(1)
-            .set_p_swapchains(&self.vk_swap_chain.unwrap())
+            .set_p_swapchains(&swapchain)
             .set_p_image_indices(&image_index);
 
-        match vk_queue_present_khr(self.vk_present_queue.unwrap(), &present_info) {
+        match vk_queue_present_khr(present_queue, &present_info) {
             Ok(()) => (),
             Err(err) => match err {
                 VulkanError::SuboptimalKhr => {
@@ -1011,7 +1047,7 @@ impl App {
             self.vk_recreate_swapchain();
         }
 
-        self.current_frame = (self.current_frame + 1) % FRAMES_IN_FLIGHT;
+        self.current_frame = (current_frame + 1) % FRAMES_IN_FLIGHT;
     }
 
     fn vk_cleanup_swapchain(self: &mut Self) {
@@ -1028,48 +1064,63 @@ impl App {
     }
 
     fn vk_recreate_swapchain(self: &mut Self) {
+        let surface = self.vk_surface_khr.unwrap();
+        let physical_device = self.vk_physical_device.unwrap();
+        let window = self.window.unwrap();
+        let logical_device = self.vk_logical_device.unwrap();
         self.framebuffer_resized = false;
-        let result = vk_device_wait_idle(self.vk_logical_device.unwrap());
+        let result = vk_device_wait_idle(logical_device);
         match result {
             Ok(()) => (),
             Err(err) => panic!("Failed to wait for device idle: {:?}", err),
         }
         self.vk_cleanup_swapchain();
-        self.vk_create_swap_chain();
-        self.vk_create_image_views();
-        self.vk_create_framebuffers();
+        let swapchain = self.vk_create_swap_chain(surface, physical_device, window, logical_device);
+        self.vk_swap_chain = Some(swapchain);
+        self.vk_create_image_views(logical_device);
+        self.vk_create_framebuffers(logical_device);
     }
 
     // GLFW FUNCTIONS
 
-    fn glfw_create_surface(self: &mut Self) {
-        self.vk_surface_khr =
-            match glfw_create_window_surface(self.vk_instance.unwrap(), self.window.unwrap()) {
-                Ok(surface) => Some(surface),
-                Err(err) => panic!("Failed to create surface: {:?}", err),
-            }
+    fn glfw_create_surface(
+        self: &mut Self,
+        instance: VkInstance,
+        window: *mut GLFWwindow,
+    ) -> VkSurfaceKHR {
+        let surface = match glfw_create_window_surface(instance, window) {
+            Ok(surface) => Some(surface),
+            Err(err) => panic!("Failed to create surface: {:?}", err),
+        }
+        .unwrap();
+        surface
     }
 
-    fn init_window(self: &mut Self) {
+    fn init_window(self: &mut Self) -> *mut GLFWwindow {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
-        self.window = match glfw_create_window(800, 600, "Vulkan") {
+
+        let window = match glfw_create_window(800, 600, "Vulkan") {
             Ok(window) => Some(window),
             Err(err) => panic!("Failed to create window: {:?}", err),
-        };
-        glfw_set_framebuffer_size_callback(self.window.unwrap(), |_width, _height| {
+        }
+        .unwrap();
+
+        glfw_set_framebuffer_size_callback(window, |_width, _height| {
             self.framebuffer_resized = true;
         });
+        window
     }
 
-    fn main_loop(self: &mut Self) {
-        while !glfw_window_should_close(self.window.unwrap()) {
+    fn main_loop(self: &mut Self, window: *mut GLFWwindow) {
+        let logical_device = self.vk_logical_device.unwrap();
+        while !glfw_window_should_close(window) {
             glfw_poll_events();
             self.draw_frame();
             sleep(Duration::from_millis(165 / 60));
         }
 
-        match vk_device_wait_idle(self.vk_logical_device.unwrap()) {
+        match vk_device_wait_idle(logical_device) {
             Ok(_) => println!("Device idle"),
             Err(err) => panic!("Failed to wait for device idle: {:?}", err),
         }
