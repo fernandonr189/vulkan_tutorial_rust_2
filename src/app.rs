@@ -131,31 +131,18 @@ impl App {
 
     fn init_vulkan(self: &mut Self, window: *mut GLFWwindow) {
         let instance = self.vk_create_instance();
-        println!("Instance created");
         let surface = self.glfw_create_surface(instance, window);
-        println!("Surface created");
         let physical_device = self.vk_pick_physical_device(instance, surface);
-        println!("Physical device picked");
         let queue_family_indices = self.vk_find_queue_families(physical_device, surface);
         let logical_device = self.vk_create_logical_device(physical_device, queue_family_indices);
-        println!("Logical device created");
         let swapchain = self.vk_create_swap_chain(surface, physical_device, window, logical_device);
-        println!("Swap chain created");
         let image_views = self.vk_create_image_views(logical_device);
-        println!("Image views created");
         let render_pass = self.vk_create_render_pass(logical_device);
-        println!("Render pass created");
         let graphics_pipeline = self.vk_create_graphics_pipeline(logical_device, render_pass);
-        println!("Graphics pipeline created");
         let framebuffers = self.vk_create_framebuffers(logical_device, &image_views, render_pass);
-        println!("Framebuffers created");
-        self.vk_create_command_pool(surface, physical_device, logical_device);
-        println!("Command pool created");
-        self.vk_create_command_buffers(logical_device);
-        println!("Command buffers created");
+        let command_pool = self.vk_create_command_pool(surface, physical_device, logical_device);
+        let command_buffers = self.vk_create_command_buffers(logical_device, command_pool);
         self.vk_create_sync_objects(logical_device);
-        println!("Sync objects created");
-
         self.vk_instance = Some(instance);
         self.vk_surface_khr = Some(surface);
         self.vk_physical_device = Some(physical_device);
@@ -165,6 +152,8 @@ impl App {
         self.vk_render_pass = Some(render_pass);
         self.vk_graphics_pipeline = Some(graphics_pipeline);
         self.vk_swap_chain_framebuffers = Arc::new(framebuffers);
+        self.vk_command_pool = Some(command_pool);
+        self.vk_command_buffer = Some(command_buffers);
     }
 
     fn vk_create_instance(self: &mut Self) -> VkInstance {
@@ -841,7 +830,7 @@ impl App {
         surface: VkSurfaceKHR,
         physical_device: VkPhysicalDevice,
         logical_device: VkDevice,
-    ) {
+    ) -> VkCommandPool {
         let queue_family_indices = self.vk_find_queue_families(physical_device, surface);
         let graphics_queue_family_index = queue_family_indices.graphics_family.unwrap();
 
@@ -850,25 +839,27 @@ impl App {
             .set_flags(VkCommandPoolCreateFlagBits_VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)
             .set_queue_family_index(graphics_queue_family_index);
 
-        self.vk_command_pool = match vk_create_command_pool(logical_device, command_pool_info) {
-            Ok(command_pool) => Some(command_pool),
+        match vk_create_command_pool(logical_device, command_pool_info) {
+            Ok(command_pool) => command_pool,
             Err(err) => panic!("Failed to create command pool: {:?}", err),
-        };
+        }
     }
 
-    fn vk_create_command_buffers(self: &mut Self, logical_device: VkDevice) {
-        let command_pool = self.vk_command_pool.unwrap();
-
+    fn vk_create_command_buffers(
+        self: &mut Self,
+        logical_device: VkDevice,
+        command_pool: VkCommandPool,
+    ) -> Vec<VkCommandBuffer> {
         let mut alloc_info = VkCommandBufferAllocateInfo::default();
         alloc_info
             .set_command_pool(command_pool)
             .set_level(VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
             .set_command_buffer_count(2);
 
-        self.vk_command_buffer = match vk_allocate_command_buffers(logical_device, alloc_info, 2) {
-            Ok(command_buffer) => Some(command_buffer),
+        match vk_allocate_command_buffers(logical_device, alloc_info, 2) {
+            Ok(command_buffer) => command_buffer,
             Err(err) => panic!("Failed to allocate command buffers: {:?}", err),
-        };
+        }
     }
 
     fn vk_record_command_buffer(
