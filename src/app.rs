@@ -3,6 +3,7 @@ use std::{
     collections::HashSet,
     ffi::c_char,
     ptr::null_mut,
+    sync::Arc,
     thread::sleep,
     time::Duration,
 };
@@ -108,7 +109,7 @@ pub struct App {
     vk_render_pass: Option<VkRenderPass>,
     vk_pipeline_layout: Option<VkPipelineLayout>,
     vk_graphics_pipeline: Option<VkPipeline>,
-    vk_swap_chain_framebuffers: Vec<VkFramebuffer>,
+    vk_swap_chain_framebuffers: Arc<Vec<VkFramebuffer>>,
     vk_command_pool: Option<VkCommandPool>,
     vk_command_buffer: Option<Vec<VkCommandBuffer>>,
     vk_image_available_semaphore: Option<Vec<VkSemaphore>>,
@@ -140,13 +141,13 @@ impl App {
         println!("Logical device created");
         let swapchain = self.vk_create_swap_chain(surface, physical_device, window, logical_device);
         println!("Swap chain created");
-        self.vk_create_image_views(logical_device);
+        let image_views = self.vk_create_image_views(logical_device);
         println!("Image views created");
-        self.vk_create_render_pass(logical_device);
+        let render_pass = self.vk_create_render_pass(logical_device);
         println!("Render pass created");
-        self.vk_create_graphics_pipeline(logical_device);
+        let graphics_pipeline = self.vk_create_graphics_pipeline(logical_device, render_pass);
         println!("Graphics pipeline created");
-        self.vk_create_framebuffers(logical_device);
+        let framebuffers = self.vk_create_framebuffers(logical_device, &image_views, render_pass);
         println!("Framebuffers created");
         self.vk_create_command_pool(surface, physical_device, logical_device);
         println!("Command pool created");
@@ -160,6 +161,10 @@ impl App {
         self.vk_physical_device = Some(physical_device);
         self.vk_logical_device = Some(logical_device);
         self.vk_swap_chain = Some(swapchain);
+        self.vk_swap_chain_image_views = image_views;
+        self.vk_render_pass = Some(render_pass);
+        self.vk_graphics_pipeline = Some(graphics_pipeline);
+        self.vk_swap_chain_framebuffers = Arc::new(framebuffers);
     }
 
     fn vk_create_instance(self: &mut Self) -> VkInstance {
@@ -545,7 +550,7 @@ impl App {
         }
     }
 
-    fn vk_create_image_views(self: &mut Self, logical_device: VkDevice) {
+    fn vk_create_image_views(self: &mut Self, logical_device: VkDevice) -> Vec<VkImageView> {
         let swapchain_image_format = self.vk_swap_chain_image_format.unwrap();
 
         let mut image_views: Vec<VkImageView> = Vec::with_capacity(self.vk_swap_chain_images.len());
@@ -576,7 +581,7 @@ impl App {
                 },
             );
         }
-        self.vk_swap_chain_image_views = image_views;
+        image_views
     }
 
     fn vk_create_shader_module(
@@ -613,8 +618,11 @@ impl App {
         }
     }
 
-    fn vk_create_graphics_pipeline(self: &mut Self, logical_device: VkDevice) {
-        let render_pass = self.vk_render_pass.unwrap();
+    fn vk_create_graphics_pipeline(
+        self: &mut Self,
+        logical_device: VkDevice,
+        render_pass: VkRenderPass,
+    ) -> VkPipeline {
         println!("Vertex shader size: {}", VERT_SHADER.len());
         println!("Fragment shader size: {}", FRAG_SHADER.len());
 
@@ -734,17 +742,19 @@ impl App {
             .set_render_pass(render_pass)
             .set_subpass(0);
 
-        self.vk_graphics_pipeline =
+        let vk_graphics_pipeline =
             match vk_create_graphics_pipeline(logical_device, pipeline_create_info) {
                 Ok(pipeline) => Some(pipeline),
                 Err(err) => panic!("Failed to create graphics pipeline: {:?}", err),
-            };
+            }
+            .unwrap();
 
         vk_destroy_shader_module(logical_device, vertex_shader_module);
         vk_destroy_shader_module(logical_device, fragment_shader_module);
+        vk_graphics_pipeline
     }
 
-    fn vk_create_render_pass(self: &mut Self, logical_device: VkDevice) {
+    fn vk_create_render_pass(self: &mut Self, logical_device: VkDevice) -> VkRenderPass {
         let swapchain_format = self.vk_swap_chain_image_format.unwrap();
         let mut color_attachment = VkAttachmentDescription::default();
         color_attachment
@@ -790,17 +800,23 @@ impl App {
             .set_dependency_count(1)
             .set_p_dependencies(&dependency);
 
-        self.vk_render_pass = match vk_create_render_pass(logical_device, render_pass_info) {
+        let render_pass = match vk_create_render_pass(logical_device, render_pass_info) {
             Ok(render_pass) => Some(render_pass),
             Err(err) => panic!("Failed to create render pass: {:?}", err),
-        };
+        }
+        .unwrap();
+        render_pass
     }
 
-    fn vk_create_framebuffers(self: &mut Self, logical_device: VkDevice) {
+    fn vk_create_framebuffers(
+        self: &mut Self,
+        logical_device: VkDevice,
+        image_views: &Vec<VkImageView>,
+        render_pass: VkRenderPass,
+    ) -> Vec<VkFramebuffer> {
         let image_extent = self.vk_swap_chain_image_extent.unwrap();
-        let render_pass = self.vk_render_pass.unwrap();
-        self.vk_swap_chain_framebuffers = Vec::with_capacity(self.vk_swap_chain_image_views.len());
-        for image_view in self.vk_swap_chain_image_views.iter() {
+        let mut framebuffers = Vec::with_capacity(image_views.len());
+        for image_view in image_views.iter() {
             let attachments = *image_view;
 
             let mut framebuffer_info = VkFramebufferCreateInfo::default();
@@ -813,10 +829,11 @@ impl App {
                 .set_layers(1);
 
             match vk_create_framebuffer(logical_device, framebuffer_info) {
-                Ok(framebuffer) => self.vk_swap_chain_framebuffers.push(framebuffer),
+                Ok(framebuffer) => framebuffers.push(framebuffer),
                 Err(err) => panic!("Failed to create framebuffer: {:?}", err),
             }
         }
+        framebuffers
     }
 
     fn vk_create_command_pool(
@@ -858,6 +875,7 @@ impl App {
         self: &mut Self,
         command_buffer: VkCommandBuffer,
         image_index: u32,
+        framebuffers: &Vec<VkFramebuffer>,
     ) {
         let renderpass = self.vk_render_pass.unwrap();
         let image_extent = self.vk_swap_chain_image_extent.unwrap();
@@ -879,7 +897,7 @@ impl App {
         let mut render_pass_begin_info = VkRenderPassBeginInfo::default();
         render_pass_begin_info
             .set_render_pass(renderpass)
-            .set_framebuffer(self.vk_swap_chain_framebuffers[image_index as usize])
+            .set_framebuffer(framebuffers[image_index as usize])
             .set_render_area(vulkan_bindings::VkRect2D {
                 offset: vulkan_bindings::VkOffset2D { x: 0, y: 0 },
                 extent: image_extent,
@@ -1006,7 +1024,8 @@ impl App {
             Err(err) => panic!("Failed to reset command buffer: {:?}", err),
         }
 
-        self.vk_record_command_buffer(command_buffer, image_index);
+        let framebuffers = self.vk_swap_chain_framebuffers.clone();
+        self.vk_record_command_buffer(command_buffer, image_index, &framebuffers);
 
         let wait_stages = VkPipelineStageFlagBits_VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         let mut submit_info = VkSubmitInfo::default();
@@ -1052,9 +1071,13 @@ impl App {
 
     fn vk_cleanup_swapchain(self: &mut Self) {
         let device = self.vk_logical_device.unwrap();
-        for swapchain_framebuffer in self.vk_swap_chain_framebuffers.drain(..) {
-            vk_destroy_framebuffer(device, swapchain_framebuffer);
+
+        let framebuffers = self.vk_swap_chain_framebuffers.clone();
+        for framebuffer in framebuffers.iter() {
+            vk_destroy_framebuffer(device, *framebuffer);
         }
+        self.vk_swap_chain_framebuffers = Arc::new(Vec::new());
+
         for swapchain_image_view in self.vk_swap_chain_image_views.drain(..) {
             vk_destroy_image_view(device, swapchain_image_view);
         }
@@ -1068,6 +1091,7 @@ impl App {
         let physical_device = self.vk_physical_device.unwrap();
         let window = self.window.unwrap();
         let logical_device = self.vk_logical_device.unwrap();
+        let render_pass = self.vk_render_pass.unwrap();
         self.framebuffer_resized = false;
         let result = vk_device_wait_idle(logical_device);
         match result {
@@ -1077,8 +1101,11 @@ impl App {
         self.vk_cleanup_swapchain();
         let swapchain = self.vk_create_swap_chain(surface, physical_device, window, logical_device);
         self.vk_swap_chain = Some(swapchain);
-        self.vk_create_image_views(logical_device);
-        self.vk_create_framebuffers(logical_device);
+        let image_views = self.vk_create_image_views(logical_device);
+        self.vk_create_framebuffers(logical_device, &image_views, render_pass);
+        let framebuffers = self.vk_create_framebuffers(logical_device, &image_views, render_pass);
+        self.vk_swap_chain_image_views = image_views;
+        self.vk_swap_chain_framebuffers = Arc::new(framebuffers);
     }
 
     // GLFW FUNCTIONS
