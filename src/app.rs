@@ -9,8 +9,8 @@ use ffi_utils::StringFfi;
 use glfw_bindings::{
     self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
     glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
-    glfw_get_required_instance_extensions, glfw_init, glfw_poll_events, glfw_terminate,
-    glfw_window_hint, glfw_window_should_close,
+    glfw_get_required_instance_extensions, glfw_init, glfw_poll_events,
+    glfw_set_framebuffer_size_callback, glfw_terminate, glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
     UINT32_MAX, VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_SUBPASS_EXTERNAL,
@@ -61,11 +61,12 @@ use vulkan_bindings::{
     VkSharingMode_VK_SHARING_MODE_EXCLUSIVE, VkSubmitInfo,
     VkSubpassContents_VK_SUBPASS_CONTENTS_INLINE, VkSubpassDependency, VkSubpassDescription,
     VkSurfaceCapabilitiesKHR, VkSurfaceFormatKHR, VkSurfaceKHR, VkSwapchainCreateInfoKHR,
-    VkSwapchainKHR, VkViewport, vk_acquire_next_image_khr, vk_allocate_command_buffers,
-    vk_begin_command_buffer, vk_cmd_begin_render_pass, vk_cmd_bind_pipeline, vk_cmd_draw,
-    vk_cmd_end_render_pass, vk_cmd_set_scissor, vk_cmd_set_viewport, vk_create_command_pool,
-    vk_create_fence, vk_create_framebuffer, vk_create_graphics_pipeline, vk_create_image_view,
-    vk_create_instance, vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
+    VkSwapchainKHR, VkViewport, VulkanError, vk_acquire_next_image_khr,
+    vk_allocate_command_buffers, vk_begin_command_buffer, vk_cmd_begin_render_pass,
+    vk_cmd_bind_pipeline, vk_cmd_draw, vk_cmd_end_render_pass, vk_cmd_set_scissor,
+    vk_cmd_set_viewport, vk_create_command_pool, vk_create_fence, vk_create_framebuffer,
+    vk_create_graphics_pipeline, vk_create_image_view, vk_create_instance,
+    vk_create_logical_device, vk_create_pipeline_layout, vk_create_render_pass,
     vk_create_semaphore, vk_create_shader_module, vk_create_swapchain_khr, vk_destroy_command_pool,
     vk_destroy_device, vk_destroy_fence, vk_destroy_framebuffer, vk_destroy_graphics_pipeline,
     vk_destroy_image_view, vk_destroy_instance, vk_destroy_pipeline_layout, vk_destroy_render_pass,
@@ -112,6 +113,7 @@ pub struct App {
     vk_render_finished_semaphore: Option<Vec<VkSemaphore>>,
     vk_in_flight_fence: Option<Vec<VkFence>>,
     current_frame: usize,
+    framebuffer_resized: bool,
 }
 
 impl App {
@@ -938,11 +940,6 @@ impl App {
             Err(err) => panic!("Failed to wait for fences: {:?}", err),
         };
 
-        match vk_reset_fences(self.vk_logical_device.unwrap(), 1, &fence) {
-            Ok(()) => (),
-            Err(err) => panic!("Failed to reset fences: {:?}", err),
-        };
-
         let image_index = match vk_acquire_next_image_khr(
             self.vk_logical_device.unwrap(),
             self.vk_swap_chain.unwrap(),
@@ -950,7 +947,19 @@ impl App {
             images_available_semaphore,
         ) {
             Ok(index) => index,
-            Err(err) => panic!("Failed to acquire next image: {:?}", err),
+            Err(err) => match err {
+                VulkanError::OutOfDateKhr(_index) => {
+                    self.vk_recreate_swapchain();
+                    println!("Next image out of date");
+                    return;
+                }
+                _ => panic!("Failed to acquire next image: {:?}", err),
+            },
+        };
+
+        match vk_reset_fences(self.vk_logical_device.unwrap(), 1, &fence) {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to reset fences: {:?}", err),
         };
 
         match vk_reset_command_buffer(command_buffer, 0) {
@@ -986,10 +995,42 @@ impl App {
 
         match vk_queue_present_khr(self.vk_present_queue.unwrap(), &present_info) {
             Ok(()) => (),
-            Err(err) => panic!("Failed to present image: {:?}", err),
+            Err(err) => match err {
+                VulkanError::SuboptimalKhr => {
+                    self.framebuffer_resized = false;
+                    println!("Swapchain suboptimal");
+                    self.vk_recreate_swapchain();
+                }
+                _ => panic!("Failed to present image: {:?}", err),
+            },
         }
 
         self.current_frame = (self.current_frame + 1) % FRAMES_IN_FLIGHT;
+    }
+
+    fn vk_cleanup_swapchain(self: &mut Self) {
+        let device = self.vk_logical_device.unwrap();
+        for swapchain_framebuffer in self.vk_swap_chain_framebuffers.iter_mut() {
+            vk_destroy_framebuffer(device, *swapchain_framebuffer);
+        }
+        for swapchain_image_view in self.vk_swap_chain_image_views.iter_mut() {
+            vk_destroy_image_view(device, *swapchain_image_view);
+        }
+        if let Some(swapchain) = self.vk_swap_chain.take() {
+            vk_destroy_swapchain_khr(device, swapchain);
+        }
+    }
+
+    fn vk_recreate_swapchain(self: &mut Self) {
+        let result = vk_device_wait_idle(self.vk_logical_device.unwrap());
+        match result {
+            Ok(()) => (),
+            Err(err) => panic!("Failed to wait for device idle: {:?}", err),
+        }
+        self.vk_cleanup_swapchain();
+        self.vk_create_swap_chain();
+        self.vk_create_image_views();
+        self.vk_create_framebuffers();
     }
 
     // GLFW FUNCTIONS
@@ -1005,11 +1046,14 @@ impl App {
     fn init_window(self: &mut Self) {
         glfw_init();
         glfw_window_hint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfw_window_hint(GLFW_RESIZABLE, GLFW_FALSE);
         self.window = match glfw_create_window(800, 600, "Vulkan") {
             Ok(window) => Some(window),
             Err(err) => panic!("Failed to create window: {:?}", err),
         };
+        glfw_set_framebuffer_size_callback(self.window.unwrap(), |_width, _height| {
+            println!("Framebuffer resized");
+            self.framebuffer_resized = true;
+        });
     }
 
     fn main_loop(self: &mut Self) {

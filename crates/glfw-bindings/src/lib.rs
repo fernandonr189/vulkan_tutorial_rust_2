@@ -114,6 +114,33 @@ pub fn glfw_get_framebuffer_size(window: *mut GLFWwindow) -> (u32, u32) {
     }
 }
 
+pub fn glfw_set_framebuffer_size_callback<F: FnMut(i32, i32)>(
+    window: *mut GLFWwindow,
+    user_callback: F,
+) {
+    unsafe {
+        // Store the callback in user data
+        let callback = Box::into_raw(Box::new(Box::new(user_callback) as Box<dyn FnMut(i32, i32)>));
+        glfwSetWindowUserPointer(window, callback as *mut _);
+
+        extern "C" fn framebuffer_size_callback(
+            window: *mut GLFWwindow,
+            width: ::std::os::raw::c_int,
+            height: ::std::os::raw::c_int,
+        ) {
+            unsafe {
+                let callback_ptr =
+                    glfwGetWindowUserPointer(window) as *mut Box<dyn FnMut(i32, i32)>;
+                if !callback_ptr.is_null() {
+                    (*callback_ptr)(width, height);
+                }
+            }
+        }
+
+        glfwSetFramebufferSizeCallback(window, Some(framebuffer_size_callback));
+    }
+}
+
 #[derive(Debug)]
 pub enum GlfwError {
     CreateWindowError,

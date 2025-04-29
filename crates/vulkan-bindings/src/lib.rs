@@ -717,7 +717,9 @@ pub fn vk_acquire_next_image_khr(
             null_mut(),
             &mut index,
         );
-        if result != VkResult_VK_SUCCESS {
+        if result == VkResult_VK_ERROR_OUT_OF_DATE_KHR {
+            Err(VulkanError::OutOfDateKhr(index))
+        } else if result != VkResult_VK_SUCCESS {
             Err(VulkanError::FailedToAcquireNextImage)
         } else {
             Ok(index)
@@ -745,7 +747,9 @@ pub fn vk_queue_present_khr(
 ) -> Result<(), VulkanError> {
     unsafe {
         let result = vkQueuePresentKHR(queue, present_info);
-        if result != VkResult_VK_SUCCESS {
+        if result == VkResult_VK_ERROR_OUT_OF_DATE_KHR || result == VkResult_VK_SUBOPTIMAL_KHR {
+            Err(VulkanError::SuboptimalKhr)
+        } else if result != VkResult_VK_SUCCESS {
             Err(VulkanError::FailedToPresentImage)
         } else {
             Ok(())
@@ -813,4 +817,6 @@ pub enum VulkanError {
     FailedToSubmitCommandBuffer,
     FailedToPresentImage,
     FailedToWaitDeviceIdle,
+    OutOfDateKhr(u32),
+    SuboptimalKhr,
 }
