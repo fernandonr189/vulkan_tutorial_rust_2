@@ -7,10 +7,10 @@ use std::{
 
 use ffi_utils::StringFfi;
 use glfw_bindings::{
-    self, GLFW_CLIENT_API, GLFW_FALSE, GLFW_NO_API, GLFW_RESIZABLE, GLFWwindow, glfw_create_window,
-    glfw_create_window_surface, glfw_destroy_window, glfw_get_framebuffer_size,
-    glfw_get_required_instance_extensions, glfw_init, glfw_poll_events,
-    glfw_set_framebuffer_size_callback, glfw_terminate, glfw_window_hint, glfw_window_should_close,
+    self, GLFW_CLIENT_API, GLFW_NO_API, GLFWwindow, glfw_create_window, glfw_create_window_surface,
+    glfw_destroy_window, glfw_get_framebuffer_size, glfw_get_required_instance_extensions,
+    glfw_init, glfw_poll_events, glfw_set_framebuffer_size_callback, glfw_terminate,
+    glfw_window_hint, glfw_window_should_close,
 };
 use vulkan_bindings::{
     UINT32_MAX, VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_SUBPASS_EXTERNAL,
@@ -114,6 +114,7 @@ pub struct App {
     vk_in_flight_fence: Option<Vec<VkFence>>,
     current_frame: usize,
     framebuffer_resized: bool,
+    recreating_swapchain: bool,
 }
 
 impl App {
@@ -997,12 +998,15 @@ impl App {
             Ok(()) => (),
             Err(err) => match err {
                 VulkanError::SuboptimalKhr => {
-                    self.framebuffer_resized = false;
                     println!("Swapchain suboptimal");
                     self.vk_recreate_swapchain();
                 }
                 _ => panic!("Failed to present image: {:?}", err),
             },
+        }
+
+        if self.framebuffer_resized {
+            self.vk_recreate_swapchain();
         }
 
         self.current_frame = (self.current_frame + 1) % FRAMES_IN_FLIGHT;
@@ -1022,6 +1026,7 @@ impl App {
     }
 
     fn vk_recreate_swapchain(self: &mut Self) {
+        self.framebuffer_resized = false;
         let result = vk_device_wait_idle(self.vk_logical_device.unwrap());
         match result {
             Ok(()) => (),
@@ -1051,7 +1056,6 @@ impl App {
             Err(err) => panic!("Failed to create window: {:?}", err),
         };
         glfw_set_framebuffer_size_callback(self.window.unwrap(), |_width, _height| {
-            println!("Framebuffer resized");
             self.framebuffer_resized = true;
         });
     }
